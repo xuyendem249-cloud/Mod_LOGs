@@ -57,7 +57,7 @@ static NSError* Failure(NSString* text){return [NSError errorWithDomain:LGErrorD
 - (void)touchesCancelled:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event{if(self.changed)self.changed(0);}
 @end
 static NSString* Digest(NSData* bytes){unsigned char hash[CC_SHA256_DIGEST_LENGTH];CC_SHA256(bytes.bytes,(CC_LONG)bytes.length,hash);NSMutableString* out=[NSMutableString string];for(unsigned char b:hash)[out appendFormat:@"%02x",b];return out;}
-static CGRect Rect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.x,origin.y+b.y,b.w,b.h);}
+static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.x,origin.y+b.y,b.w,b.h);}
 @interface LGPlayer:UIViewController<UIDocumentPickerDelegate,UITableViewDataSource,UITableViewDelegate> {
  std::unique_ptr<Legend::PlayerCore> _core;
  dispatch_queue_t _worker;
@@ -143,10 +143,10 @@ static CGRect Rect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.x,
 }
 - (void)viewDidLayoutSubviews {
  [super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);Legend::ControllerGeometry g(a.size.width,a.size.height,_fusionMode==2);CGPoint o=a.origin;
- _screen.frame=Rect(g.fittedGame(),o);_guide.frame=Rect(g.guide,o);_guide.hidden=_fusionMode!=2;_toolbar.frame=Rect(g.toolbar,o);
- _pads[@10].frame=Rect(g.shoulder(false,false),o);_pads[@12].frame=Rect(g.shoulder(false,true),o);_pads[@13].frame=Rect(g.shoulder(true,false),o);_pads[@11].frame=Rect(g.shoulder(true,true),o);
- [self cluster:Rect(g.pad(false),o) right:NO];[self cluster:Rect(g.pad(true),o) right:YES];_dpad.frame=Rect(g.pad(false),o);
- _pads[@2].frame=Rect(g.selectStart(false),o);_pads[@3].frame=Rect(g.selectStart(true),o);_logo.frame=Rect(g.logo(),o);
+ _screen.frame=LGRect(g.fittedGame(),o);_guide.frame=LGRect(g.guide,o);_guide.hidden=_fusionMode!=2;_toolbar.frame=LGRect(g.toolbar,o);
+ _pads[@10].frame=LGRect(g.shoulder(false,false),o);_pads[@12].frame=LGRect(g.shoulder(false,true),o);_pads[@13].frame=LGRect(g.shoulder(true,false),o);_pads[@11].frame=LGRect(g.shoulder(true,true),o);
+ [self cluster:LGRect(g.pad(false),o) right:NO];[self cluster:LGRect(g.pad(true),o) right:YES];_dpad.frame=LGRect(g.pad(false),o);
+ _pads[@2].frame=LGRect(g.selectStart(false),o);_pads[@3].frame=LGRect(g.selectStart(true),o);_logo.frame=LGRect(g.logo(),o);
  _placeholder.frame=CGRectInset(_screen.bounds,20,20);_welcome.frame=CGRectInset(_screen.bounds,10,10);_welcome.hidden=_ready;_overlay.frame=_screen.bounds;_overlay.hidden=_fusionMode==0;
  CGFloat tw=_toolbar.bounds.size.width,th=_toolbar.bounds.size.height;_menu.frame=CGRectMake(1,1,38,th-2);_fusion.frame=CGRectMake(42,1,66,th-2);_load.frame=CGRectMake(tw-51,1,50,th-2);_save.frame=CGRectMake(tw-104,1,50,th-2);_save.titleLabel.font=_load.titleLabel.font=[UIFont systemFontOfSize:12];_credit.frame=CGRectMake(110,22,MAX(0,tw-216),13);_credit.hidden=tw<280;
  [_fusion setTitle:_fusionMode==0?@"Fusion: Tắt":_fusionMode==1?@"Fusion: Số":@"Fusion: VIP" forState:0];[_fusion setTitleColor:_fusionMode?Gold():UIColor.whiteColor forState:0];_fusion.accessibilityLabel=@[@"Fusion tắt",@"Fusion chỉ đánh số thứ tự",@"Fusion số và bảng hướng dẫn"][_fusionMode];

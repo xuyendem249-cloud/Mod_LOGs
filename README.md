@@ -3,8 +3,12 @@
 Chuyển các chức năng của Android 5 / Ver 16 sang iPhone 14, iOS 17.6.1.
 Giữ nguyên Android, APK, BIOS, ISO và save người dùng.
 
-**Mã nguồn 0.3 đã được tích hợp và kiểm tra phần C++/dữ liệu/hiệu ứng cục bộ.
-Chưa được Apple SDK build hoặc chạy game trên iPhone với phiên bản 0.3.**
+**0.3 đã build thành công bằng Apple SDK cho iPhone/Simulator; cả ba job xanh.
+Simulator đã mở app và đủ 14 nút trong khung. Chưa chạy lại game trên iPhone thật.**
+
+Lượt xác minh: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020
+IPA chưa ký: `build/LegendPlayer-iOS-0.3.0-unsigned.ipa`.
+Báo cáo: `build/verified-0.3.0.json`.
 Lượt build #8 thuộc 0.2; người dùng đã cài được bản đó và báo đứng khi hạ bài.
 
 ## Có trong nguồn 0.3
@@ -47,3 +51,5 @@ Build Apple phải thành công trước, sau đó IPA chưa ký cần ký bằn
 nhân như cách đã cài 0.2. Giữ cùng Apple ID/bundle ID và cài đè; không xóa app
 cũ để giữ BIOS/game/thẻ nhớ trong Documents/Legend. Không kèm ISO/BIOS/save,
 khóa ký hoặc Apple ID trong nguồn/artifact. Chưa có TestFlight.
+
+Hướng dẫn cài đè: [CAI_DAT_0.3.md](CAI_DAT_0.3.md).

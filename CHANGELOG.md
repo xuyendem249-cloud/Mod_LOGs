@@ -1,10 +1,10 @@
-# 0.3.0 (build 3) — nguồn đang chờ Apple SDK
+# 0.3.0 (build 3) — Apple SDK + Simulator đã qua
 
 - VIP/Fusion, 10 slot, cấu hình, thẻ nhớ và điều khiển theo Android 5.
 - Chuyển bộ vá hạ bài/trap/LP và hiệu chỉnh địa chỉ owner khi xuống sân phá bài.
 - Nền tím/đen và hoa văn/viền vàng rõ hơn.
 - Kiểm tra C++ dữ liệu với oracle và replay native PS1 có load-delay.
-- Chưa phát hành IPA 0.3; xem PARITY.md.
+- Đã tạo IPA 0.3 chưa ký, cả ba job Apple xanh; game trên iPhone chờ người dùng kiểm tra.
 
 # Legend iOS
 

@@ -1,7 +1,7 @@
 {
   "name": "Legend Player iOS",
   "stage": 4,
-  "stage_name": "Feature parity source implemented; Apple build and device retest pending",
+  "stage_name": "iOS 0.3 Apple build and Simulator verified; device gameplay retest pending",
   "reference_android": "Android 5 / Ver 16",
   "target_device": "iPhone 14",
   "target_ios": "17.6.1",
@@ -16,10 +16,10 @@
   "installable_app_available": false,
   "step1_core_gate_passed": true,
   "step1_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39557932135",
-  "native_app_built_with_apple_sdk": false,
+  "native_app_built_with_apple_sdk": true,
   "step2_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
-  "simulator_smoke_passed": false,
-  "unsigned_ipa_available": false,
+  "simulator_smoke_passed": true,
+  "unsigned_ipa_available": true,
   "signed_for_device": false,
   "testflight_uploaded": false,
   "iphone_runtime_tested": false,
@@ -33,5 +33,9 @@
     "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
     "installed_by_user": true,
     "user_reported_summon_freeze": true
-  }
+  },
+  "step3_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020",
+  "step3_commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3",
+  "unsigned_ipa": "build/LegendPlayer-iOS-0.3.0-unsigned.ipa",
+  "unsigned_ipa_sha256": "dfc7fee52932ed52a78a7091459d29497bb43818ad825ceaaf6f9bc2b9440f37"
 }

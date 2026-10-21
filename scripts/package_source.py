@@ -5,10 +5,10 @@ def main():
  output=ROOT/'Legend-iOS-0.3-source.zip';files=[]
  for folder in ['scripts','Sources','tests','.github','Resources']:
   files.extend(p for p in (ROOT/folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts)
- files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
+ files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','CAI_DAT_0.3.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
  files.append(ROOT/'build/local_check_report.json')
  files.append(ROOT/'build/step1_verified_report.json')
- for name in ['native-effects/ios_effects_report.json','native-effects/player_traps_report.json','native-effects/player_summon_destruction_report.json','parity_check_report.json']:
+ for name in ['native-effects/ios_effects_report.json','native-effects/player_traps_report.json','native-effects/player_summon_destruction_report.json','native-effects/summon_cpp_report.json','parity_check_report.json','verified-0.3.0.json','cloud_run_verified.json']:
   if (ROOT/'build'/name).exists():files.append(ROOT/'build'/name)
  with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as z:
   for path in sorted(files):

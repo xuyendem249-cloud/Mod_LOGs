@@ -3,7 +3,7 @@
 No Apple account, certificate, provisioning profile, upload, or device installation.
 """
 from pathlib import Path,PurePosixPath
-import argparse,hashlib,io,json,plistlib,shutil,stat,struct,zipfile
+import argparse,hashlib,io,json,plistlib,shutil,stat,struct,tarfile,zipfile
 ROOT=Path(__file__).resolve().parents[1]
 
 def sha(data):return hashlib.sha256(data).hexdigest()
@@ -50,6 +50,17 @@ def main(directory,app_version,source_run):
    if sdk=='portable-tests':
     assert core['macos_api_probe_passed'] and core['frontend_tests_passed'] and core['audio_tests_passed']
    else:
+    source_matches=0
+    with tarfile.open(fileobj=io.BytesIO(outer.read('app-artifacts/CorrespondingSource.tar.gz')),mode='r:gz') as source:
+     for folder in ['Sources','Resources']:
+      for local in (ROOT/folder).rglob('*'):
+       if not local.is_file():continue
+       name=local.relative_to(ROOT).as_posix();remote=source.extractfile(name)
+       assert remote is not None,'Source artifact missing '+name
+       expected=local.read_bytes();actual=remote.read()
+       if local.suffix in ('.cpp','.hpp','.mm','.plist','.txt'):expected=expected.replace(b'\r\n',b'\n');actual=actual.replace(b'\r\n',b'\n')
+       assert actual==expected,'Source artifact differs from local '+name
+       source_matches+=1
     report=json.loads(outer.read('app-artifacts/app_build_report.json'))
     assert report['sdk']==sdk and report['apple_sdk_app_compiled'] and not report['signed_for_device']
     nested='app-artifacts/Legend-Step2-'+sdk+'-unsigned-app.zip';app_data=outer.read(nested)
@@ -74,7 +85,7 @@ def main(directory,app_version,source_run):
       assert 'Legend.app/embedded.mobileprovision' not in app.namelist()
       assert 'Legend.app/_CodeSignature/CodeResources' not in app.namelist()
       device_app=app_data
-     item.update(app_report=report,macho=binary)
+     item.update(app_report=report,macho=binary,matching_source_resource_files=source_matches)
     (output/('Legend-'+sdk+'-app.zip')).write_bytes(app_data)
     if sdk=='iphonesimulator':
      smoke=json.loads(outer.read('iphonesimulator/simulator_smoke_report.json'))

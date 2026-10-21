@@ -1,7 +1,8 @@
 # Legend iOS 0.3 — đối chiếu Android 5 / Ver 16
 
-Bản này là mã nguồn đang chờ Apple SDK build và chạy lại trên iPhone. Kết quả
-build thành công cũ (#8, iOS 0.2) không xác minh giao diện hoặc game của 0.3.
+Bản 0.3 đã build Apple SDK và chạy smoke trong Simulator thành công: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020 .
+Cả ba job xanh, 19 file nguồn/tài nguyên khớp artifact, binary ARM64 iOS 17.
+Game/animation/hiệu năng vẫn cần chạy lại trên iPhone thật.
 
 | Chức năng Android | Phần chuyển sang iOS 0.3 | Kiểm tra hiện có |
 |---|---|---|

@@ -110,7 +110,7 @@ NSAttributedString* LGDescription(GameData& data,int card){
 @end
 
 @implementation LGSettingsController
-- (void)viewDidLoad{[super viewDidLoad];self.title=@"Cấu hình · Legend iOS 0.3";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
+- (void)viewDidLoad{[super viewDidLoad];self.title=@"Cấu hình · Legend iOS 0.3.1";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
 - (void)close{[self dismissViewControllerAnimated:YES completion:self.closed];}
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)table{return 3;}
 - (NSInteger)tableView:(UITableView*)table numberOfRowsInSection:(NSInteger)section{return section==0?4:section==1?6:1;}

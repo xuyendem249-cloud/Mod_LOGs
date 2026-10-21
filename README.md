@@ -1,14 +1,12 @@
-# Legend Player iOS 0.3
+# Legend Player iOS 0.3.1
 
-Chuyển các chức năng của Android 5 / Ver 16 sang iPhone 14, iOS 17.6.1.
-Giữ nguyên Android, APK, BIOS, ISO và save người dùng.
+Đồng bộ sửa tên bài và đánh x2/x3 từ PC Ver 12, cùng Android 6 / Ver 17, cho iPhone 14, iOS 17.6.1. Giữ các chức năng của iOS 0.3; không thêm tool gian lận hoặc sửa BIOS, ISO, save người dùng.
 
-**0.3 đã build thành công bằng Apple SDK cho iPhone/Simulator; cả ba job xanh.
-Simulator đã mở app và đủ 14 nút trong khung. Chưa chạy lại game trên iPhone thật.**
+**0.3.1 đang chờ build Apple SDK và kiểm tra Simulator; không coi lượt build 0.3 cũ là kết quả của bản này. Chưa chạy game bản mới trên iPhone thật.**
 
-Lượt xác minh: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020
-IPA chưa ký: `build/LegendPlayer-iOS-0.3.0-unsigned.ipa`.
-Báo cáo: `build/verified-0.3.0.json`.
+Lượt 0.3 cũ: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020
+Tên IPA mới sau khi build/kiểm chứng: `build/LegendPlayer-iOS-0.3.1-unsigned.ipa`.
+Báo cáo mới sẽ là `build/verified-0.3.1.json`. Xem `CAI_DAT_0.3.1.md` để cài cập nhật.
 Lượt build #8 thuộc 0.2; người dùng đã cài được bản đó và báo đứng khi hạ bài.
 
 ## Có trong nguồn 0.3

@@ -28,7 +28,7 @@ def main(sdk):
  info.update(plistlib.loads(partial.read_bytes()));(app/'Info.plist').write_bytes(plistlib.dumps(info))
  # Simulator ad-hoc signing needs no Apple identity. Device output is intentionally unsigned.
  if sdk=='iphonesimulator':run(['codesign','--force','--sign','-',app])
- report={'stage':3,'app_version':'0.3.0','sdk':sdk,'target':target,'apple_sdk_app_compiled':True,'signed_for_device':False,'installable_on_iphone':False,'testflight_uploaded':False,'game_or_bios_tested':False,'executable_sha256':hashlib.sha256((app/'Legend').read_bytes()).hexdigest()}
+ report={'stage':3,'app_version':info['CFBundleShortVersionString'],'app_build':info['CFBundleVersion'],'sdk':sdk,'target':target,'apple_sdk_app_compiled':True,'signed_for_device':False,'installable_on_iphone':False,'testflight_uploaded':False,'game_or_bios_tested':False,'executable_sha256':hashlib.sha256((app/'Legend').read_bytes()).hexdigest()}
  archive=folder/('Legend-Step2-'+sdk+'-unsigned-app.zip')
  with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
   for p in app.rglob('*'):

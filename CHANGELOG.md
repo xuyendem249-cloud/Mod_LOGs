@@ -1,3 +1,9 @@
+# 0.3.1 (build 4) — 22/10/2026
+
+- Đồng bộ hai sửa lỗi PC Ver 12: dùng đúng tên bài trong Chest/Deck và giữ danh sách thưởng 15 lá ở đúng màn; sửa load-delay bộ đếm để nhóm x2/x3 đánh đúng giới hạn mỗi lượt.
+- Giữ dữ liệu/bảng hiệu ứng gốc, bộ đếm riêng từng ô, cả hai phía và reset lượt. Áp dụng RAM có chữ ký/guard; không thay ISO, BIOS, save hoặc thêm tool gian lận.
+- Cập nhật cùng bundle ID vn.anhchugia35.legend. Apple build/Simulator của bản này đang chờ chạy; game thực tế trên iPhone cần kiểm tra sau khi cài.
+
 # 0.3.0 (build 3) — Apple SDK + Simulator đã qua
 
 - VIP/Fusion, 10 slot, cấu hình, thẻ nhớ và điều khiển theo Android 5.

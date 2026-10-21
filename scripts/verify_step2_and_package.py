@@ -72,7 +72,7 @@ def main(directory,app_version,source_run):
      executable=app.read('Legend.app/Legend');assert sha(executable)==report['executable_sha256']
      info=plistlib.loads(app.read('Legend.app/Info.plist'));binary=macho(executable)
      assert info['CFBundleShortVersionString']==app_version,'Artifact is not the requested app version'
-     if app_version=='0.3.0':
+     if app_version in ('0.3.0','0.3.1'):
       assert report['stage']==3 and report['app_version']==app_version
       assert any('/GameController.framework/' in name for name in binary['linked_libraries'])
       assert {'Legend.app/welcome.png','Legend.app/LICENSES.txt'}.issubset(app.namelist())
@@ -109,4 +109,4 @@ def main(directory,app_version,source_run):
  result={'source_run':source_run,'app_version':app_version,'verified_artifacts':reports,'unsigned_ipa':str(ipa.relative_to(ROOT)),'ipa_sha256':sha(ipa.read_bytes()),'ipa_bytes':ipa.stat().st_size,'debug_symbols_excluded':excluded,'signed_for_device':False,'installable_without_signing':False,'iphone_runtime_tested':False,'game_or_bios_tested':False,'testflight_uploaded':False}
  (ROOT/('build/verified-'+app_version+'.json')).write_text(json.dumps(result,indent=2));print(json.dumps({k:v for k,v in result.items() if k!='verified_artifacts'},indent=2))
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('directory');p.add_argument('--version',default='0.3.0',choices=['0.2.0','0.3.0']);p.add_argument('--run',required=True);args=p.parse_args();main(args.directory,args.version,args.run)
+ p=argparse.ArgumentParser();p.add_argument('directory');p.add_argument('--version',default='0.3.1',choices=['0.2.0','0.3.0','0.3.1']);p.add_argument('--run',required=True);args=p.parse_args();main(args.directory,args.version,args.run)

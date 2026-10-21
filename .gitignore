@@ -1,0 +1,16 @@
+vendor/
+build/
+toolchain/
+__pycache__/
+.DS_Store
+*.ipa
+*.p12
+*.p8
+*.mobileprovision
+*.keychain*
+*.iso
+*.bin
+*.img
+*.mcr
+*.mcd
+*.state

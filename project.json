@@ -1,0 +1,16 @@
+{
+  "name": "Legend Player iOS",
+  "stage": 1,
+  "stage_name": "Core build feasibility and frontend primitives",
+  "reference_android": "Android 5 / Ver 16",
+  "target_device": "iPhone 14",
+  "target_ios": "17.6.1",
+  "minimum_ios": "17.0",
+  "architectures": ["arm64"],
+  "renderer": "Software",
+  "cpu_execution": "Interpreter",
+  "jit": false,
+  "recording": false,
+  "installable_app_available": false,
+  "intended_distribution": "TestFlight after native iOS app and signing are ready"
+}

@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/libretro/swanstation.git",
+  "commit": "cc94ebcd38a88a0e90788d7c8bcd764a009a5fa0",
+  "license": "GPL-3.0",
+  "android_reference": "legend_android/assets/THIRD_PARTY.json",
+  "patch_profile": "legend-ios-interpreter-v1"
+}

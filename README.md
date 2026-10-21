@@ -1,57 +1,49 @@
-# Legend Player iOS — Bước 1
+# Legend Player iOS 0.3
 
-Mục tiêu: iPhone 14, iOS 17.6.1. Lấy Android 5 / Ver 16 làm mẫu, giữ nguyên dự án Android.
+Chuyển các chức năng của Android 5 / Ver 16 sang iPhone 14, iOS 17.6.1.
+Giữ nguyên Android, APK, BIOS, ISO và save người dùng.
 
-**Đây là gói nguồn và bộ kiểm tra khả năng build core, chưa phải app iPhone. Chưa có IPA và chưa có link TestFlight. Core iPhoneOS đã biên dịch thành công ở lượt GitHub đầu tiên; chưa test trên iPhone.**
+**Mã nguồn 0.3 đã được tích hợp và kiểm tra phần C++/dữ liệu/hiệu ứng cục bộ.
+Chưa được Apple SDK build hoặc chạy game trên iPhone với phiên bản 0.3.**
+Lượt build #8 thuộc 0.2; người dùng đã cài được bản đó và báo đứng khi hạ bài.
 
-## Tiến độ chạy trên GitHub — 21/10/2026
+## Có trong nguồn 0.3
 
-- Repository: https://github.com/xuyendem249-cloud/Mod_LOGs .
-- Lượt chạy đầu: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39554205968 .
-- `core (iphoneos)` thành công, artifact `Legend-Step1-iphoneos` đã được GitHub tạo. Kết quả này xác nhận thư viện core biên dịch bằng Apple SDK, không xác nhận chạy game trên iPhone.
-- `core (macosx)` biên dịch thư viện xong nhưng dừng khi biên dịch test: `fatal error: 'array' file not found`. Lệnh clang++ cho test thiếu `-isysroot`.
-- Đã bổ sung `-isysroot sdkroot` cho cả hai lệnh test trong bản nguồn trên máy. Bản sửa chưa được lưu lên GitHub và chưa chạy lại: công cụ báo điều khiển trình duyệt bị tắt trong Work settings.
+- Sửa context/actor khi hạ bài; LP battle, 23 trap của mod và nhóm xuống sân
+  phá bài. Mỗi lần chạy frame chỉ áp dụng trên đúng SHA game và chữ ký mã RAM.
+- VIP: 40 NPC, Deck, SA POW, BCD POW, SA TECH, toàn bộ Fusion theo terrain;
+  lọc ID/tên/nguyên liệu/kết quả; ảnh, mô tả có icon, 40 lá thực tế từ RAM.
+- Fusion ba chế độ; thứ tự tối ưu 2–5 lá, giữ lựa chọn, nhận bài đã nâng,
+  đánh số tại tọa độ bài và cảnh báo đổi thứ tự mạnh hơn.
+- 10 slot lưu nhanh có checksum/core-version/backup; giữ thẻ .mcr cũ và cho
+  tải state 0.2 ở slot 1. Nhập/xuất thẻ RAW 128 KB, xác nhận reset.
+- Tốc độ 1/1.3/1.5/2/2.5/3/4×, âm lượng, đa chạm/D-pad chéo, bàn phím và
+  tay cầm; hình gốc 4:3, âm thanh stereo, dọc/ngang theo safe area.
+- Nền tím–đen gradient đậm, viền vàng và họa tiết rõ hơn, logo/welcome;
+  license/mã nguồn trong cấu hình. Không có chức năng quay clip.
 
-## Bước hiện tại đã chuẩn bị gì?
+Chi tiết, bằng chứng và giới hạn từng chức năng: [PARITY.md](PARITY.md).
 
-- Chốt đúng mã nguồn SwanStation `cc94ebcd38a88a0e90788d7c8bcd764a009a5fa0`, cùng dòng core đang dùng trên Android.
-- Script có kiểm tra nguồn trước khi sửa, tắt recompiler/JIT và mmap-fastmem, bỏ mã cấp phát JIT và dependency VIXL khỏi bản build này. Chuyển libretro sang static archive để liên kết trực tiếp vào app sau này, không tải thư viện Android.
-- Nhánh cấp phát arena iOS dùng file tạm thuộc sandbox và mmap, thay vì POSIX shared-memory `shm_open`. Đây là thay đổi cần kiểm chứng trên iPhone, không khẳng định đã chạy được chỉ từ việc đọc mã.
-- Phần frontend C++ dùng byte RGBA rõ ràng để tránh lỗi đỏ/xanh; nhận input đa chạm và xung tối thiểu theo đồng hồ input riêng, xóa phím khi xoay/ra nền/tải save.
-- Workflow thủ công chạy hai cổng kiểm tra trên máy Mac ARM64: core macOS + API init/deinit + unit test frontend; core iPhone ARM64 bằng Apple iPhoneOS SDK. Nó kiểm tra không có source/flag JIT được biên dịch và kiểm tra các hàm libretro cần thiết trong archive.
-- Gói nguồn không kèm ISO, BIOS, thẻ nhớ, tài khoản hay khóa ký. Workflow không cần bí mật Apple để biên dịch **thư viện core**.
+## Build và kiểm tra
 
-## Đã kiểm tra đến đâu?
+Máy Mac/Xcode: `python3 scripts/build_app.py --sdk iphoneos` và tương tự
+`iphonesimulator`; `python3 scripts/build_core.py --sdk macosx` chạy kiểm tra
+pixel/input/audio, guard vá RAM, bố cục và API core.
+`python3 scripts/simulator_smoke.py` kiểm tra khởi động và 14 nút.
+Core lấy đúng commit trong sources.lock.json; không dùng JIT hay ký Apple.
 
-`build/local_check_report.json` ghi rõ các kiểm tra chạy trên Windows: phiên bản nguồn, 6 thay đổi có kiểm tra mẫu, từ chối nguồn khác mẫu, cú pháp Python, bộ workflow và cú pháp C++ ARM64 bằng compiler đã có trong dự án Android. Compiler đó không phải Apple SDK; không dùng kết quả này để tuyên bố core iOS đã build hay đã chạy.
+Windows: `scripts/local_checks.py` kiểm tra nguồn/ARM64 syntax.
+`tests/parity_test.cpp` so sánh với oracle cục bộ (ISO/RAM không đưa lên GitHub).
+`scripts/test_native_effects.py` dùng DLL C++ patcher thực tế, chạy lại các
+test trap/destruction PS1 load-delay. Báo cáo nằm trong build/native-effects.
 
-Các kiểm tra runtime C++ và core sẽ chỉ được xác nhận khi workflow macOS chạy thành công. `scripts/build_core.py` từ chối chạy trên Windows với thông báo rõ ràng.
+Giữ tên artifact `Legend-Step2-*` để tương thích workflow hiện có. Xác minh
+phiên bản trong Info.plist/app_build_report.json trước khi đóng gói IPA 0.3.
+Source ZIP mới: `Legend-iOS-0.3-source.zip`. Không dùng IPA 0.2 làm bản sửa.
 
-## Bước tiếp theo dành cho bạn
+## Cài cập nhật
 
-1. Tài khoản và repository đã được tạo; chưa cần trả tiền Apple Developer ở bước kiểm tra core.
-2. Cập nhật file `scripts/build_core.py` bằng bản đã sửa trên máy. Workflow đã nằm đúng `.github/workflows/core-build.yml`; không cần tải lại toàn bộ repository.
-3. Vào **Actions → Legend iOS - Step 1 core gate → Run workflow**. Workflow chỉ chạy khi bấm thủ công, không tự chạy khi đẩy file.
-4. Nếu thành công, tải hai artifact `Legend-Step1-macosx` và `Legend-Step1-iphoneos`. Đây là thư viện `.a`, báo cáo và mã nguồn core tương ứng; không cài trực tiếp lên điện thoại.
-5. Khi core qua cổng kiểm tra này mới làm app UIKit: chọn BIOS/ISO, hình 4:3, âm thanh, nút cảm ứng. Chạy game ổn rồi chuyển VIP/Fusion và sau đó mới làm ký/TestFlight.
-
-Máy Mac chạy trên dịch vụ GitHub, bạn không cần sở hữu Mac. Repository riêng dùng hạn mức phút của tài khoản; hãy giữ tắt chi tiêu trả phí và kiểm tra hạn mức trước khi chạy. Không tạo tài khoản Apple hay nhập khóa Apple vào GitHub ở bước này. Nguồn về runner/hạn mức: https://docs.github.com/en/actions/reference/runners/github-hosted-runners .
-
-## Chạy thủ công trên máy Mac
-
-Cần Git, Python 3, CMake và Xcode đã chọn bằng `xcode-select`:
-
-```text
-python3 scripts/prepare_core.py
-python3 scripts/build_core.py --sdk macosx
-python3 scripts/build_core.py --sdk iphoneos
-```
-
-Không nhầm `macosx` với `iphoneos`: test init/deinit trên macOS không thay thế kiểm tra sandbox, hiệu năng, âm thanh và vòng đời app trên iPhone.
-
-## Trình tự sau bước 1
-
-1. Core iPhone qua kiểm tra biên dịch, thư viện và API.
-2. App iOS tối thiểu mở game, 4:3, màu/âm thanh, nút và dọc/ngang; test iPhone thật.
-3. Thẻ nhớ/save, metadata từ ISO, VIP và hai chế độ gợi ý Fusion.
-4. Ký bằng tài khoản phát hành phù hợp, tải App Store Connect, phân phối TestFlight. Việc này cần tài khoản Apple Developer; gói nguồn hiện tại không tự tạo tài khoản, mua gói hay tải bất kỳ ứng dụng nào lên Apple.
+Build Apple phải thành công trước, sau đó IPA chưa ký cần ký bằng công cụ cá
+nhân như cách đã cài 0.2. Giữ cùng Apple ID/bundle ID và cài đè; không xóa app
+cũ để giữ BIOS/game/thẻ nhớ trong Documents/Legend. Không kèm ISO/BIOS/save,
+khóa ký hoặc Apple ID trong nguồn/artifact. Chưa có TestFlight.

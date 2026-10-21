@@ -1,16 +1,37 @@
 {
   "name": "Legend Player iOS",
-  "stage": 1,
-  "stage_name": "Core build feasibility and frontend primitives",
+  "stage": 4,
+  "stage_name": "Feature parity source implemented; Apple build and device retest pending",
   "reference_android": "Android 5 / Ver 16",
   "target_device": "iPhone 14",
   "target_ios": "17.6.1",
   "minimum_ios": "17.0",
-  "architectures": ["arm64"],
+  "architectures": [
+    "arm64"
+  ],
   "renderer": "Software",
   "cpu_execution": "Interpreter",
   "jit": false,
   "recording": false,
   "installable_app_available": false,
-  "intended_distribution": "TestFlight after native iOS app and signing are ready"
+  "step1_core_gate_passed": true,
+  "step1_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39557932135",
+  "native_app_built_with_apple_sdk": false,
+  "step2_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
+  "simulator_smoke_passed": false,
+  "unsigned_ipa_available": false,
+  "signed_for_device": false,
+  "testflight_uploaded": false,
+  "iphone_runtime_tested": false,
+  "vip_fusion_ported": true,
+  "mod_compatibility_patches_ported": true,
+  "intended_distribution": "TestFlight after native iOS app and signing are ready",
+  "version": "0.3.0",
+  "build": 3,
+  "previous_release": {
+    "version": "0.2.0",
+    "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
+    "installed_by_user": true,
+    "user_reported_summon_freeze": true
+  }
 }

@@ -19,10 +19,10 @@ def main():
  # Reuse an existing compiler only for portable C++ syntax; this is NOT an iOS SDK.
  compilers=list((ROOT.parent/'legend_android/toolchain/ndk').glob('android-ndk-*/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe'))
  if sys.platform=='win32' and compilers:
-  for name,include in [('frontend_test.cpp',ROOT/'Sources/Core'),('audio_test.cpp',ROOT/'Sources/Core'),('core_probe.cpp',source/'dep/libretro-common/include')]:
+  for name,include in [('frontend_test.cpp',ROOT/'Sources/Core'),('audio_test.cpp',ROOT/'Sources/Core'),('compatibility_test.cpp',ROOT/'Sources/Core'),('geometry_test.cpp',ROOT/'Sources/Core'),('parity_test.cpp',ROOT/'Sources/Core'),('core_probe.cpp',source/'dep/libretro-common/include')]:
    subprocess.run([str(compilers[0]),'--target=aarch64-linux-android24','-std=c++17','-Wall','-Wextra','-Werror','-fsyntax-only','-I'+str(include),str(ROOT/'tests'/name)],check=True)
   cpp_syntax=True
-  subprocess.run([str(compilers[0]),'--target=aarch64-linux-android24','-std=c++17','-Wall','-Wextra','-Werror','-fsyntax-only','-I'+str(ROOT/'Sources/Core'),'-I'+str(source/'dep/libretro-common/include'),str(ROOT/'Sources/Core/PlayerCore.cpp')],check=True)
+  subprocess.run([str(compilers[0]),'--target=aarch64-linux-android24','-std=c++17','-Wall','-Wextra','-Werror','-fsyntax-only','-I'+str(ROOT/'Sources/Core'),'-I'+str(source/'dep/libretro-common/include'),*[str(ROOT/'Sources/Core'/name) for name in ['PlayerCore.cpp','GameData.cpp','FusionAdvisor.cpp']]],check=True)
  report=dict(passed=True,core_commit=sha,guarded_patch_files=len(expected),unknown_upstream_rejected=True,python_syntax_checked=True,manual_cloud_workflow_prepared=True,portable_cpp_arm64_syntax_checked=cpp_syntax,apple_sdk_build_executed=False,frontend_runtime_executed=False,iphone_runtime_tested=False,ipa_available=False,testflight_available=False)
  (ROOT/'build/local_check_report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 if __name__=='__main__':main()

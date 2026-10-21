@@ -1,0 +1,56 @@
+name: Legend iOS 0.3 parity validation
+on:
+  push:
+    branches: [codex/ios-parity-03]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  app:
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [iphoneos, iphonesimulator]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm Apple build environment
+        run: |
+          xcodebuild -version
+          xcrun --sdk "${{ matrix.sdk }}" --show-sdk-version
+      - name: Build UIKit frontend and static core
+        run: python3 scripts/build_app.py --sdk "${{ matrix.sdk }}"
+      - name: Launch simulator app without BIOS or game
+        if: matrix.sdk == 'iphonesimulator'
+        run: python3 scripts/simulator_smoke.py
+      - name: Preserve corresponding source and license
+        if: success()
+        run: |
+          mkdir -p build/app-artifacts
+          cp "build/${{ matrix.sdk }}/Legend-Step2-${{ matrix.sdk }}-unsigned-app.zip" build/app-artifacts/
+          cp "build/${{ matrix.sdk }}/app_build_report.json" build/app-artifacts/
+          cp "build/${{ matrix.sdk }}/build_report.json" build/app-artifacts/core_build_report.json
+          cp build/core_patch_report.json build/app-artifacts/
+          cp vendor/swanstation/LICENSE build/app-artifacts/SwanStation_LICENSE.txt
+          tar --exclude=.git --exclude='*.o' --exclude='*.a' -czf build/app-artifacts/CorrespondingSource.tar.gz Sources Resources scripts tests vendor/swanstation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Legend-Step2-${{ matrix.sdk }}
+          path: |
+            build/app-artifacts/
+            build/iphonesimulator/simulator_smoke_report.json
+            build/${{ matrix.sdk }}/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+  portable-tests:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/build_core.py --sdk macosx
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Legend-Step2-portable-tests
+          path: build/macosx/build_report.json

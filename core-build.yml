@@ -1,0 +1,39 @@
+name: Legend iOS - Step 1 core gate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [macosx, iphoneos]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm Apple build environment
+        run: |
+          xcodebuild -version
+          xcrun --sdk "${{ matrix.sdk }}" --show-sdk-version
+          cmake --version
+      - name: Build pinned core and verify no-JIT configuration
+        run: python3 scripts/build_core.py --sdk "${{ matrix.sdk }}"
+      - name: Export reports, static library and corresponding patched source
+        if: success()
+        run: |
+          mkdir -p build/artifacts
+          cp "build/${{ matrix.sdk }}/LegendSwanStation.a" build/artifacts/
+          cp "build/${{ matrix.sdk }}/build_report.json" build/artifacts/
+          cp build/core_patch_report.json build/artifacts/
+          cp vendor/swanstation/LICENSE build/artifacts/SwanStation_LICENSE.txt
+          tar --exclude=.git --exclude='*.o' --exclude='*.a' -czf build/artifacts/CorrespondingSource.tar.gz -C vendor swanstation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Legend-Step1-${{ matrix.sdk }}
+          path: |
+            build/artifacts/
+            build/${{ matrix.sdk }}/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn

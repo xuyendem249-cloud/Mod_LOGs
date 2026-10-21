@@ -9,7 +9,7 @@ def main():
  files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','CAI_DAT_0.3.md','CAI_DAT_0.3.1.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
  files.append(ROOT/'build/local_check_report.json')
  files.append(ROOT/'build/step1_verified_report.json')
- for name in ['native-effects/ios_effects_report.json','native-effects/player_traps_report.json','native-effects/player_summon_destruction_report.json','native-effects/summon_cpp_report.json','parity_check_report.json','verified-0.3.0.json','cloud_run_verified.json']:
+ for name in ['native-effects/ios_effects_report.json','native-effects/player_traps_report.json','native-effects/player_summon_destruction_report.json','native-effects/summon_cpp_report.json','parity_check_report.json']:
   if (ROOT/'build'/name).exists():files.append(ROOT/'build'/name)
  for name in ['card-effects/mobile_effects_report.json','card-effects/player_card_effects_report.json','card-effects/player_traps_report.json','card-effects/player_summon_destruction_report.json','verified-'+version+'.json']:
   if (ROOT/'build'/name).exists():files.append(ROOT/'build'/name)

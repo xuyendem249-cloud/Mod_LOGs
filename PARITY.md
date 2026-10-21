@@ -1,3 +1,7 @@
+# iOS 0.3.1 — bổ sung sau Android 6 / Ver 17
+
+Bản 0.3.1 build 4 đã qua Apple SDK và Simulator ở run 39650587896, commit 874ecf87ce8127e9aed2537c0409a0864f978bce. Bổ sung hai sửa lỗi tên bài/x2/x3 của PC Ver12 và nền Trò chơi Ngàn năm được duyệt. Ảnh nền đóng trong IPA khớp byte với nguồn và Simulator đã báo tải thành công. Chưa kiểm tra chơi game/BIOS trên iPhone thật; IPA cần ký lại bằng Sideloadly. Auto mới của Android 8 chưa được yêu cầu chuyển sang iOS.
+
 # Legend iOS 0.3 — đối chiếu Android 5 / Ver 16
 
 Bản 0.3 đã build Apple SDK và chạy smoke trong Simulator thành công: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020 .

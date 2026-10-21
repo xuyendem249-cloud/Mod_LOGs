@@ -3,7 +3,7 @@
 - Đồng bộ hai sửa lỗi PC Ver 12: dùng đúng tên bài trong Chest/Deck và giữ danh sách thưởng 15 lá ở đúng màn; sửa load-delay bộ đếm để nhóm x2/x3 đánh đúng giới hạn mỗi lượt.
 - Giữ dữ liệu/bảng hiệu ứng gốc, bộ đếm riêng từng ô, cả hai phía và reset lượt. Áp dụng RAM có chữ ký/guard; không thay ISO, BIOS, save hoặc thêm tool gian lận.
 - Áp dụng nền Trò chơi Ngàn năm được người dùng duyệt ngày 22/10: kim tự tháp vàng, Con mắt Ngàn năm, đền Ai Cập tím đen; bỏ hoàn toàn chữ AI. Ảnh nền tự phủ khung khi dọc/ngang, nằm dưới game/nút và không nhận cảm ứng. Chưa đưa mẫu này sang Android.
-- Cập nhật cùng bundle ID vn.anhchugia35.legend. Apple build/Simulator của bản này đang chờ chạy; game thực tế trên iPhone cần kiểm tra sau khi cài.
+- Cập nhật cùng bundle ID vn.anhchugia35.legend. Apple build/Simulator của bản này đã qua cả ba tác vụ ở run 39650587896; đã đối chiếu nguồn, nền PNG và binary, tạo IPA chưa ký. Game thực tế trên iPhone cần kiểm tra sau khi cài.
 
 # 0.3.0 (build 3) — Apple SDK + Simulator đã qua
 

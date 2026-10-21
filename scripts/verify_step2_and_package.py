@@ -58,7 +58,7 @@ def main(directory,app_version,source_run):
        name=local.relative_to(ROOT).as_posix();remote=source.extractfile(name)
        assert remote is not None,'Source artifact missing '+name
        expected=local.read_bytes();actual=remote.read()
-       if local.suffix in ('.cpp','.hpp','.mm','.plist','.txt'):expected=expected.replace(b'\r\n',b'\n');actual=actual.replace(b'\r\n',b'\n')
+       if local.suffix in ('.cpp','.hpp','.mm','.plist','.txt','.json'):expected=expected.replace(b'\r\n',b'\n');actual=actual.replace(b'\r\n',b'\n')
        assert actual==expected,'Source artifact differs from local '+name
        source_matches+=1
     report=json.loads(outer.read('app-artifacts/app_build_report.json'))

@@ -4,11 +4,12 @@
 
 Nền mới Trò chơi Ngàn năm đã được người dùng xem và duyệt: kim tự tháp/Con mắt Ngàn năm vàng trên đền Ai Cập tím đen, không có chữ AI. Ảnh chỉ dùng cho nền app iOS, nằm dưới vùng game và các nút; tự căn dọc/ngang.
 
-**0.3.1 đang chờ build Apple SDK và kiểm tra Simulator; không coi lượt build 0.3 cũ là kết quả của bản này. Chưa chạy game bản mới trên iPhone thật.**
+**0.3.1 đã build Apple SDK và qua kiểm tra Simulator ở cả ba tác vụ. Đã xác minh nguồn/tài nguyên, nền mới và đóng gói IPA chưa ký; chưa chạy BIOS/game bản mới trên iPhone thật.**
 
-Lượt 0.3 cũ: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020
-Tên IPA mới sau khi build/kiểm chứng: `build/LegendPlayer-iOS-0.3.1-unsigned.ipa`.
-Báo cáo mới sẽ là `build/verified-0.3.1.json`. Xem `CAI_DAT_0.3.1.md` để cài cập nhật.
+Lượt 0.3.1: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39650587896
+Commit nguồn: `874ecf87ce8127e9aed2537c0409a0864f978bce`.
+IPA đã kiểm chứng: `build/LegendPlayer-iOS-0.3.1-unsigned.ipa`.
+Báo cáo: `build/verified-0.3.1.json`. Xem `CAI_DAT_0.3.1.md` để cài cập nhật.
 Lượt build #8 thuộc 0.2; người dùng đã cài được bản đó và báo đứng khi hạ bài.
 
 ## Có trong nguồn 0.3
@@ -42,8 +43,8 @@ Windows: `scripts/local_checks.py` kiểm tra nguồn/ARM64 syntax.
 test trap/destruction PS1 load-delay. Báo cáo nằm trong build/native-effects.
 
 Giữ tên artifact `Legend-Step2-*` để tương thích workflow hiện có. Xác minh
-phiên bản trong Info.plist/app_build_report.json trước khi đóng gói IPA 0.3.
-Source ZIP mới: `Legend-iOS-0.3-source.zip`. Không dùng IPA 0.2 làm bản sửa.
+phiên bản trong Info.plist/app_build_report.json trước khi đóng gói IPA 0.3.1.
+Source ZIP mới: `Legend-iOS-0.3.1-source.zip`. Không dùng IPA 0.2 làm bản sửa.
 
 ## Cài cập nhật
 
@@ -52,4 +53,6 @@ nhân như cách đã cài 0.2. Giữ cùng Apple ID/bundle ID và cài đè; kh
 cũ để giữ BIOS/game/thẻ nhớ trong Documents/Legend. Không kèm ISO/BIOS/save,
 khóa ký hoặc Apple ID trong nguồn/artifact. Chưa có TestFlight.
 
-Hướng dẫn cài đè: [CAI_DAT_0.3.md](CAI_DAT_0.3.md).
+Hướng dẫn cài đè: [CAI_DAT_0.3.1.md](CAI_DAT_0.3.1.md).
+
+IPA SHA-256: `f32fc82b835e0667a9ed0208ee47895e49e5c41e6bf3b14d186cac5e493a66b0`.

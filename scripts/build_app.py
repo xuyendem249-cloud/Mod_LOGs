@@ -12,7 +12,9 @@ def main(sdk):
  target='arm64-apple-ios17.0'+('-simulator' if sdk=='iphonesimulator' else '')
  sources=[ROOT/'Sources/App/main.mm',ROOT/'Sources/Core/PlayerCore.cpp']
  args=[clang,'-target',target,'-isysroot',sdkroot,'-std=c++17','-fobjc-arc','-fblocks','-O2','-g','-Wall','-Wextra','-Wno-unused-parameter','-Wno-deprecated-declarations','-I'+str(ROOT/'Sources/Core'),'-I'+str(ROOT/'vendor/swanstation/dep/libretro-common/include'),*sources,folder/'LegendSwanStation.a','-o',app/'Legend']
- for framework in ['UIKit','Foundation','CoreFoundation','AVFoundation','AudioToolbox','QuartzCore','UniformTypeIdentifiers']:args+=['-framework',framework]
+ # The direct clang build does not enable Clang module autolinking. Link the
+ # CoreGraphics APIs used by main.mm explicitly for device AND simulator.
+ for framework in ['UIKit','Foundation','CoreFoundation','CoreGraphics','AVFoundation','AudioToolbox','QuartzCore','UniformTypeIdentifiers']:args+=['-framework',framework]
  args+=['-lobjc'];run(args)
  info=plistlib.loads((ROOT/'Resources/Info.plist').read_bytes());info['CFBundleSupportedPlatforms']=['iPhoneSimulator' if sdk=='iphonesimulator' else 'iPhoneOS'];info['DTPlatformName']=sdk;info['DTSDKName']=sdk+capture(['xcrun','--sdk',sdk,'--show-sdk-version'])
  shutil.copyfile(ROOT/'Resources/AppLogo.png',app/'AppLogo.png')

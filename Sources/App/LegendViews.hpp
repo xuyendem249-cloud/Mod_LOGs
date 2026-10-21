@@ -8,7 +8,9 @@ UIImage* LGPixels(const std::vector<uint32_t>&,int,int);
 NSString* LGText(const std::string&);
 NSString* LGOrder(const std::vector<int>&);
 NSAttributedString* LGDescription(Legend::GameData&,int);
-@interface LGBackdrop:UIView @end
+@interface LGBackdrop:UIView
+@property(nonatomic,readonly) BOOL hasApprovedArtwork;
+@end
 @interface LGFusionOverlay:UIView
 - (void)showView:(const Legend::DuelView&)view row:(const Legend::FusionRow*)row;
 @end

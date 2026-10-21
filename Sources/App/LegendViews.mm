@@ -15,18 +15,16 @@ NSAttributedString* LGDescription(GameData& data,int card){
  for(NSTextCheckingResult* match in [regex matchesInString:raw options:0 range:NSMakeRange(0,raw.length)]){[out appendAttributedString:[[NSAttributedString alloc]initWithString:[raw substringWithRange:NSMakeRange(start,match.range.location-start)]]];NSInteger icon=[[raw substringWithRange:[match rangeAtIndex:1]] integerValue];if(icon>=0&&icon<41){NSTextAttachment* a=[[NSTextAttachment alloc]init];a.image=LGPixels(data.icons[icon],16,16);a.bounds=CGRectMake(0,-3,16,16);[out appendAttributedString:[NSAttributedString attributedStringWithAttachment:a]];}start=NSMaxRange(match.range);}
  [out appendAttributedString:[[NSAttributedString alloc]initWithString:[raw substringFromIndex:start]]];if(out.length)[out addAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:14],NSForegroundColorAttributeName:UIColor.whiteColor} range:NSMakeRange(0,out.length)];return out;
 }
-@implementation LGBackdrop
+@implementation LGBackdrop{UIImageView* _artwork;}
+- (instancetype)initWithFrame:(CGRect)frame{
+ if((self=[super initWithFrame:frame])){self.backgroundColor=LGInk();self.contentMode=UIViewContentModeRedraw;self.clipsToBounds=YES;
+ _artwork=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"DuelTemple-v1.png"]];_artwork.contentMode=UIViewContentModeScaleAspectFill;_artwork.clipsToBounds=YES;_artwork.userInteractionEnabled=NO;_artwork.accessibilityIdentifier=@"legend-millennium-background";[self addSubview:_artwork];}return self;
+}
+- (BOOL)hasApprovedArtwork{return _artwork.image!=nil;}
+- (void)layoutSubviews{[super layoutSubviews];_artwork.frame=self.bounds;}
 - (void)drawRect:(CGRect)rect{
- CGContextRef c=UIGraphicsGetCurrentContext();CGFloat w=self.bounds.size.width,h=self.bounds.size.height;
- CGColorSpaceRef space=CGColorSpaceCreateDeviceRGB();CGFloat colours[]={.025,.015,.06,1, .22,.065,.32,1, .055,.025,.11,1};CGFloat positions[]={0,.48,1};CGGradientRef gradient=CGGradientCreateWithColorComponents(space,colours,positions,3);CGContextDrawLinearGradient(c,gradient,CGPointZero,CGPointMake(w,h),0);CGGradientRelease(gradient);CGColorSpaceRelease(space);
- CGContextSetStrokeColorWithColor(c,[LGGold() colorWithAlphaComponent:.55].CGColor);CGContextSetLineWidth(c,1.5);CGContextStrokeRect(c,CGRectInset(self.bounds,5,5));CGContextStrokeRect(c,CGRectInset(self.bounds,10,10));
- CGFloat cx=w*.5,cy=h*.52,r=MIN(w,h)*.43;CGContextSetLineWidth(c,2);CGContextSetStrokeColorWithColor(c,[LGGold() colorWithAlphaComponent:.23].CGColor);
- for(int j=0;j<3;j++)CGContextStrokeEllipseInRect(c,CGRectMake(cx-r+j*9,cy-r+j*9,2*(r-j*9),2*(r-j*9)));
- CGContextMoveToPoint(c,cx,cy-r*.84);CGContextAddLineToPoint(c,cx+r*.76,cy+r*.55);CGContextAddLineToPoint(c,cx-r*.76,cy+r*.55);CGContextClosePath(c);CGContextStrokePath(c);
- // Eye motif and geometric glyphs stay outside the opaque game image.
- CGContextMoveToPoint(c,cx-r*.4,cy);CGContextAddQuadCurveToPoint(c,cx,cy-r*.3,cx+r*.4,cy);CGContextAddQuadCurveToPoint(c,cx,cy+r*.3,cx-r*.4,cy);CGContextStrokePath(c);CGContextStrokeEllipseInRect(c,CGRectMake(cx-r*.12,cy-r*.12,r*.24,r*.24));
- CGContextSetStrokeColorWithColor(c,[LGGold() colorWithAlphaComponent:.4].CGColor);
- for(CGFloat y=32;y<h-24;y+=44)for(CGFloat x: {CGFloat(22),w-22}){CGContextMoveToPoint(c,x-5,y);CGContextAddLineToPoint(c,x+5,y);CGContextAddLineToPoint(c,x,y+8);CGContextAddLineToPoint(c,x,y+20);CGContextMoveToPoint(c,x-6,y+15);CGContextAddLineToPoint(c,x+6,y+15);CGContextStrokePath(c);}
+ // An opaque backing also covers the unlikely missing-resource fallback.
+ [LGInk() setFill];UIRectFill(rect);
 }
 @end
 @implementation LGFusionOverlay{DuelView _view;FusionRow _row;BOOL _has;}

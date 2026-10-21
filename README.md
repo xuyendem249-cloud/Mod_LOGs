@@ -2,6 +2,8 @@
 
 Đồng bộ sửa tên bài và đánh x2/x3 từ PC Ver 12, cùng Android 6 / Ver 17, cho iPhone 14, iOS 17.6.1. Giữ các chức năng của iOS 0.3; không thêm tool gian lận hoặc sửa BIOS, ISO, save người dùng.
 
+Nền mới Trò chơi Ngàn năm đã được người dùng xem và duyệt: kim tự tháp/Con mắt Ngàn năm vàng trên đền Ai Cập tím đen, không có chữ AI. Ảnh chỉ dùng cho nền app iOS, nằm dưới vùng game và các nút; tự căn dọc/ngang.
+
 **0.3.1 đang chờ build Apple SDK và kiểm tra Simulator; không coi lượt build 0.3 cũ là kết quả của bản này. Chưa chạy game bản mới trên iPhone thật.**
 
 Lượt 0.3 cũ: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020

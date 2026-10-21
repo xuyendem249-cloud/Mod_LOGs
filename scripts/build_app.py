@@ -17,7 +17,7 @@ def main(sdk):
  for framework in ['UIKit','Foundation','CoreFoundation','CoreGraphics','AVFoundation','AudioToolbox','QuartzCore','UniformTypeIdentifiers','GameController']:args+=['-framework',framework]
  args+=['-lobjc'];run(args)
  info=plistlib.loads((ROOT/'Resources/Info.plist').read_bytes());info['CFBundleSupportedPlatforms']=['iPhoneSimulator' if sdk=='iphonesimulator' else 'iPhoneOS'];info['DTPlatformName']=sdk;info['DTSDKName']=sdk+capture(['xcrun','--sdk',sdk,'--show-sdk-version'])
- for name in ['AppLogo.png','welcome.png','LICENSES.txt']:shutil.copyfile(ROOT/'Resources'/name,app/name)
+ for name in ['AppLogo.png','welcome.png','DuelTemple-v1.png','LICENSES.txt']:shutil.copyfile(ROOT/'Resources'/name,app/name)
  # Use Apple's own asset compiler for the app icon. Never package personal game files.
  catalog=folder/'Assets.xcassets';icon=catalog/'AppIcon.appiconset';icon.mkdir(parents=True,exist_ok=True)
  run(['sips','-z','1024','1024',ROOT/'Resources/AppLogo.png','--out',icon/'AppIcon.png'])

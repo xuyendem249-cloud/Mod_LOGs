@@ -41,6 +41,7 @@ jobs:
           path: |
             build/app-artifacts/
             build/iphonesimulator/simulator_smoke_report.json
+            build/iphonesimulator/background-preview.png
             build/${{ matrix.sdk }}/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: warn
   portable-tests:

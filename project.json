@@ -34,5 +34,12 @@
     "commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3"
   },
   "step3_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020",
-  "step3_commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3"
+  "step3_commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3",
+  "native_effect_replay_passed": true,
+  "approved_background": {
+    "file": "Resources/DuelTemple-v1.png",
+    "approved_by_user": true,
+    "date": "2026-10-22"
+  },
+  "superseded_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39649047240"
 }

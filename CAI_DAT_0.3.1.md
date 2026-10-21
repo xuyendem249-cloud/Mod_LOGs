@@ -5,6 +5,7 @@ Ngày 22/10/2026, build 4. Đồng bộ bản vá PC Ver 12.
 - Sửa tên bài trong Chest/Deck: 001 hiện Blue-eyes W.Dragon, không lấy tên từ các lá thưởng của trận trước.
 - 84/529 tối đa ba lần đánh, 668 tối đa hai lần mỗi lượt; giữ cùng giới hạn native cho toàn bộ nhóm x2/x3, cả hai phía và năm ô sân.
 - Không thêm tool gian lận; không kèm hoặc sửa ISO/BIOS/save.
+- Dùng nền Trò chơi Ngàn năm đã được duyệt, thay mẫu chữ AI. Android chưa đổi nền theo mẫu này.
 
 Khi IPA mới đã build và xác minh xong: dùng Sideloadly, chọn đúng iPhone và Apple ID đã ký bản cũ, chọn Legend-iOS-0.3.1.ipa, rồi Start. Nhập mật khẩu/mã xác thực trực tiếp trong Sideloadly khi được hỏi. Không cần xóa Legend đang có; cùng bundle ID/tài khoản ký giúp cài cập nhật giữ dữ liệu, tùy trạng thái chữ ký của thiết bị.
 

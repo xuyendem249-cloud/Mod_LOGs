@@ -76,6 +76,8 @@ def main(directory,app_version,source_run):
       assert report['stage']==3 and report['app_version']==app_version
       assert any('/GameController.framework/' in name for name in binary['linked_libraries'])
       assert {'Legend.app/welcome.png','Legend.app/LICENSES.txt'}.issubset(app.namelist())
+     if app_version=='0.3.1':
+      assert app.read('Legend.app/DuelTemple-v1.png')==(ROOT/'Resources/DuelTemple-v1.png').read_bytes()
      assert info['CFBundleIdentifier']=='vn.anhchugia35.legend' and info['CFBundleExecutable']=='Legend'
      assert info['MinimumOSVersion']=='17.0' and binary['minimum_os']=='17.0.0'
      assert binary['platform']==(2 if sdk=='iphoneos' else 7) and not binary['encrypted']
@@ -90,6 +92,7 @@ def main(directory,app_version,source_run):
     if sdk=='iphonesimulator':
      smoke=json.loads(outer.read('iphonesimulator/simulator_smoke_report.json'))
      assert smoke['app_launched'] and smoke['all_14_buttons_inside_view'] and not smoke['game_or_bios_tested']
+     if app_version=='0.3.1':assert smoke['approved_background_loaded']
      item['simulator_smoke']=smoke
    shutil.copyfile(path,output/path.name);reports.append(item)
  assert device_app is not None

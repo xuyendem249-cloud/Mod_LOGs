@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "core_commit": "cc94ebcd38a88a0e90788d7c8bcd764a009a5fa0",
+  "guarded_patch_files": 6,
+  "unknown_upstream_rejected": true,
+  "python_syntax_checked": true,
+  "manual_cloud_workflow_prepared": true,
+  "portable_cpp_arm64_syntax_checked": true,
+  "apple_sdk_build_executed": false,
+  "frontend_runtime_executed": false,
+  "iphone_runtime_tested": false,
+  "ipa_available": false,
+  "testflight_available": false
+}

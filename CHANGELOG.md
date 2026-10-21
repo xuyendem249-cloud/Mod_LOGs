@@ -1,5 +1,11 @@
 # Legend iOS
 
+## Sửa lệnh kiểm thử Apple SDK — 21/10/2026
+
+- GitHub run 39554205968: core iPhoneOS thành công; tác vụ macOS lỗi thiếu header C++ khi biên dịch test.
+- Thêm `-isysroot` chỉ rõ SDK vào cả hai lệnh clang++ chạy test macOS.
+- Bản sửa mới kiểm tra trên Windows, chưa được cập nhật lên GitHub hoặc chạy lại bằng Apple SDK.
+
 ## Bước 1 — 21/10/2026
 
 - Tách workspace iOS, lấy Android 5 / Ver 16 làm mốc; iPhone 14/iOS 17.6.1.

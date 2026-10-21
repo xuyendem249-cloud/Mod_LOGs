@@ -2,7 +2,15 @@
 
 Mục tiêu: iPhone 14, iOS 17.6.1. Lấy Android 5 / Ver 16 làm mẫu, giữ nguyên dự án Android.
 
-**Đây là gói nguồn và bộ kiểm tra khả năng build core, chưa phải app iPhone. Chưa có IPA và chưa có link TestFlight. Chưa chạy build bằng Apple SDK hoặc test trên iPhone.**
+**Đây là gói nguồn và bộ kiểm tra khả năng build core, chưa phải app iPhone. Chưa có IPA và chưa có link TestFlight. Core iPhoneOS đã biên dịch thành công ở lượt GitHub đầu tiên; chưa test trên iPhone.**
+
+## Tiến độ chạy trên GitHub — 21/10/2026
+
+- Repository: https://github.com/xuyendem249-cloud/Mod_LOGs .
+- Lượt chạy đầu: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39554205968 .
+- `core (iphoneos)` thành công, artifact `Legend-Step1-iphoneos` đã được GitHub tạo. Kết quả này xác nhận thư viện core biên dịch bằng Apple SDK, không xác nhận chạy game trên iPhone.
+- `core (macosx)` biên dịch thư viện xong nhưng dừng khi biên dịch test: `fatal error: 'array' file not found`. Lệnh clang++ cho test thiếu `-isysroot`.
+- Đã bổ sung `-isysroot sdkroot` cho cả hai lệnh test trong bản nguồn trên máy. Bản sửa chưa được lưu lên GitHub và chưa chạy lại: công cụ báo điều khiển trình duyệt bị tắt trong Work settings.
 
 ## Bước hiện tại đã chuẩn bị gì?
 
@@ -21,8 +29,8 @@ Các kiểm tra runtime C++ và core sẽ chỉ được xác nhận khi workflo
 
 ## Bước tiếp theo dành cho bạn
 
-1. Tạo tài khoản GitHub miễn phí tại https://github.com/signup . Chưa cần trả tiền Apple Developer ở bước kiểm tra core.
-2. Sau khi có tài khoản, mình sẽ hướng dẫn tạo repository và đưa **nội dung gói nguồn đã giải nén** vào gốc repository. `.github/workflows/core-build.yml` phải nằm đúng ở gốc, không lồng thêm một thư mục ngoài.
+1. Tài khoản và repository đã được tạo; chưa cần trả tiền Apple Developer ở bước kiểm tra core.
+2. Cập nhật file `scripts/build_core.py` bằng bản đã sửa trên máy. Workflow đã nằm đúng `.github/workflows/core-build.yml`; không cần tải lại toàn bộ repository.
 3. Vào **Actions → Legend iOS - Step 1 core gate → Run workflow**. Workflow chỉ chạy khi bấm thủ công, không tự chạy khi đẩy file.
 4. Nếu thành công, tải hai artifact `Legend-Step1-macosx` và `Legend-Step1-iphoneos`. Đây là thư viện `.a`, báo cáo và mã nguồn core tương ứng; không cài trực tiếp lên điện thoại.
 5. Khi core qua cổng kiểm tra này mới làm app UIKit: chọn BIOS/ISO, hình 4:3, âm thanh, nút cảm ứng. Chạy game ổn rồi chuyển VIP/Fusion và sau đó mới làm ký/TestFlight.

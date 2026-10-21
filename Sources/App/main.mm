@@ -109,8 +109,8 @@ static CGRect FitGame(CGRect area){CGFloat w=MIN(area.size.width,area.size.heigh
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator{[self releaseButtons];_clock=0;[super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];[coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context){[self.view setNeedsLayout];} completion:nil];}
 - (void)cluster:(CGRect)area right:(BOOL)right {
  CGFloat s=MIN(area.size.width,area.size.height);CGRect box=CGRectMake(CGRectGetMidX(area)-s/2,CGRectGetMidY(area)-s/2,s,s);CGFloat u=s/3;
- NSArray* ids=right?@[@9,@0,@1,@8]:@[@4,@5,@6,@7];NSArray* points=@[[NSValue valueWithCGPoint:CGPointMake(1,0)],[NSValue valueWithCGPoint:CGPointMake(1,2)],[NSValue valueWithCGPoint:CGPointMake(0,1)],[NSValue valueWithCGPoint:CGPointMake(2,1)]];
- for(NSUInteger i=0;i<4;i++){CGPoint p=points[i].CGPointValue;_pads[ids[i]].frame=CGRectInset(CGRectMake(box.origin.x+p.x*u,box.origin.y+p.y*u,u,u),2,2);}
+ NSArray* ids=right?@[@9,@0,@1,@8]:@[@4,@5,@6,@7];const CGPoint points[4]={CGPointMake(1,0),CGPointMake(1,2),CGPointMake(0,1),CGPointMake(2,1)};
+ for(NSUInteger i=0;i<4;i++){CGPoint p=points[i];_pads[ids[i]].frame=CGRectInset(CGRectMake(box.origin.x+p.x*u,box.origin.y+p.y*u,u,u),2,2);}
 }
 - (void)viewDidLayoutSubviews {
  [super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);CGFloat x=a.origin.x,y=a.origin.y,w=a.size.width,h=a.size.height,g=6;

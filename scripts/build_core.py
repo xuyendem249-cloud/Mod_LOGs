@@ -29,8 +29,10 @@ def build(sdk):
  if sdk=='macosx':
   clang=capture(['xcrun','--find','clang++']);include=source/'dep/libretro-common/include';tests=ROOT/'tests'
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(ROOT/'Sources/Core'),tests/'frontend_test.cpp','-o',folder/'frontend_test']);run([folder/'frontend_test'])
+  run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(ROOT/'Sources/Core'),tests/'audio_test.cpp','-o',folder/'audio_test']);run([folder/'audio_test'])
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(include),tests/'core_probe.cpp',combined,'-framework','CoreFoundation','-lobjc','-o',folder/'core_probe']);run([folder/'core_probe',folder/'probe-data'])
   report['macos_api_probe_passed']=True;report['frontend_tests_passed']=True
+  report['audio_tests_passed']=True
  (folder/'build_report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--sdk',choices=['macosx','iphoneos','iphonesimulator'],required=True);args=p.parse_args();build(args.sdk)

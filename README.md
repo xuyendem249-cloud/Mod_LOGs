@@ -1,6 +1,12 @@
 # Legend Player iOS 0.3.3 (build 6)
 
-Phóng lớn logo Auto ở cả dọc/ngang, cắt hình tròn hoàn toàn bằng giao diện, giữ nguyên ảnh và viền xoay. Đang chờ Apple SDK/Simulator xác minh; chưa có IPA 0.3.3.
+Phóng lớn logo Auto ở cả dọc/ngang, cắt hình tròn hoàn toàn bằng giao diện, giữ nguyên ảnh và viền xoay. Apple SDK/Simulator đã qua cả ba tác vụ; logo lớn/tròn, viền Auto, tốc độ và bố cục dọc/ngang đã được kiểm chứng. Chưa thử gameplay trên iPhone thật.
+
+IPA mới: `build/LegendPlayer-iOS-0.3.3-unsigned.ipa`. Cài đè bằng Sideloadly theo [CAI_DAT_0.3.3.md](CAI_DAT_0.3.3.md).
+Lượt build: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39705216780
+Commit: `ccbc3b73a24fafc354f520a3a247bc4d9a21b611`.
+SHA-256: `bd431d1aa8accbca4f8ef235846a00099722c455589c0c5394b48ceb7cef4c4e`.
+Source: `Legend-iOS-0.3.3-source.zip`.
 
 ## Bản 0.3.2 (build 5)
 

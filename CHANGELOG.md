@@ -2,7 +2,7 @@
 
 - Phóng lớn logo Auto: khung 46 pt dọc / 44 pt ngang, cao cân với các nút thanh công cụ; ảnh bên trong lớn hơn khoảng 40%.
 - Cắt hiển thị tròn cả ảnh và nút, không sửa ảnh/nền gốc. Giữ viền xoay riêng bên ngoài.
-- Giữ Auto, tốc độ đồng bộ và màn hình ngang 4:3 đầy chiều cao có thể; đang chờ kiểm tra Apple SDK.
+- Giữ Auto, tốc độ đồng bộ và màn hình ngang 4:3 đầy chiều cao có thể; đã qua Apple SDK/Simulator ở cả ba tác vụ, run 39705216780.
 
 # 0.3.2 (build 5) — 22/10/2026
 

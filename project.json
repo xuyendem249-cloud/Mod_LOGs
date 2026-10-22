@@ -1,7 +1,7 @@
 {
   "name": "Legend Player iOS",
   "stage": 5,
-  "stage_name": "Larger circular Auto logo; Apple validation pending",
+  "stage_name": "iOS 0.3.3 Apple build + Simulator passed; device gameplay pending",
   "reference_android": "Android 8 / Ver 19 (includes Android 6 / Ver 17 compatibility fixes)",
   "target_device": "iPhone 14",
   "target_ios": "17.6.1",
@@ -16,10 +16,10 @@
   "installable_app_available": false,
   "step1_core_gate_passed": true,
   "step1_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39557932135",
-  "native_app_built_with_apple_sdk": false,
+  "native_app_built_with_apple_sdk": true,
   "step2_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
-  "simulator_smoke_passed": false,
-  "unsigned_ipa_available": false,
+  "simulator_smoke_passed": true,
+  "unsigned_ipa_available": true,
   "signed_for_device": false,
   "testflight_uploaded": false,
   "iphone_runtime_tested": false,
@@ -49,5 +49,9 @@
   "quick_speed_button": true,
   "step5_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976",
   "step5_commit": "57d12e00e5ed1fc014cdb7780c52ee0f1eca8464",
-  "circular_auto_logo": true
+  "circular_auto_logo": true,
+  "unsigned_ipa": "build/LegendPlayer-iOS-0.3.3-unsigned.ipa",
+  "unsigned_ipa_sha256": "bd431d1aa8accbca4f8ef235846a00099722c455589c0c5394b48ceb7cef4c4e",
+  "step6_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39705216780",
+  "step6_commit": "ccbc3b73a24fafc354f520a3a247bc4d9a21b611"
 }

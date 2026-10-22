@@ -1,3 +1,7 @@
+# Bổ sung iOS 0.3.3
+
+Logo Auto lớn hơn, khung 46 pt dọc / 44 pt ngang, ảnh hiển thị tròn bằng clipping của UIKit, giữ nguyên tài nguyên gốc. Viền xoay nằm ngoài vòng ảnh. Apple build và Simulator hai hướng đã qua: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39705216780. Giữ toàn bộ chức năng 0.3.2. Chưa thử gameplay iPhone thật.
+
 # Bổ sung iOS 0.3.2
 
 Auto theo Android 8/Ver19 đã chuyển sang C++ và chạy qua cùng native core oracle, trace trùng từng bước ở bốn kịch bản. Điều khiển thật gửi qua mask nguyên tử riêng, người chơi chạm nút sẽ tắt Auto; không sửa trạng thái game. Nút tốc độ và Cấu hình dùng chung bộ giá trị/formatter. Bản 0.3.2 đã qua Apple SDK iPhone/Simulator và kiểm tra giao diện hai hướng: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976. Nguồn/tài nguyên khớp artifact; logo/viền Auto, đồng bộ tốc độ với core và khoảng cao màn hình ngang đã được xác minh. Gameplay iPhone vẫn cần kiểm tra sau cài.

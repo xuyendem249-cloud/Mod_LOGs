@@ -41,6 +41,8 @@ jobs:
             build/iphonesimulator/simulator_smoke_report.json
             build/iphonesimulator/background-portrait.png
             build/iphonesimulator/background-landscape.png
+            build/iphonesimulator/failure-*.png
+            build/iphonesimulator/smoke-runtime.log
             build/${{ matrix.sdk }}/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: warn
   portable-tests:

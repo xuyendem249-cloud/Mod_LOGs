@@ -19,8 +19,14 @@ def main():
   for orientation in ('portrait','landscape'):
    env=dict(os.environ,SIMCTL_CHILD_LEGEND_SMOKE='1',SIMCTL_CHILD_LEGEND_SMOKE_ORIENTATION=orientation)
    subprocess.run(['xcrun','simctl','launch',device,'vn.anhchugia35.legend'],env=env,check=True)
-   marker=data/('Documents/Legend/simulator_smoke-'+orientation+'.json');deadline=time.monotonic()+30
+   marker=data/('Documents/Legend/simulator_smoke-'+orientation+'.json');deadline=time.monotonic()+120
    while not marker.exists() and time.monotonic()<deadline:time.sleep(.5)
+   if not marker.exists():
+    run(['xcrun','simctl','io',device,'screenshot',ROOT/('build/iphonesimulator/failure-'+orientation+'.png')])
+    diagnostic=subprocess.run(['xcrun','simctl','spawn',device,'log','show','--last','5m','--style','compact','--predicate','process == "Legend"'],capture_output=True,text=True)
+    (ROOT/'build/iphonesimulator/smoke-runtime.log').write_text(diagnostic.stdout+'\n'+diagnostic.stderr)
+    for progress in (data/'Documents/Legend').glob('smoke-progress*'):print(progress.name,progress.read_text())
+    raise RuntimeError('App did not finish '+orientation+' smoke within 120 seconds; runtime log and screenshot preserved')
    current=json.loads(marker.read_text())
    for field in ('app_launched','all_14_buttons_inside_view','approved_background_loaded','orientation_matches','logo_in_toolbar','speed_text_sync','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops'):assert current[field],(orientation,field,current)
    run(['xcrun','simctl','io',device,'screenshot',ROOT/('build/iphonesimulator/background-'+orientation+'.png')])

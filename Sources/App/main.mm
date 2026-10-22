@@ -126,7 +126,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _guide=[[UITableView alloc]initWithFrame:CGRectZero style:UITableViewStylePlain];_guide.dataSource=self;_guide.delegate=self;_guide.backgroundColor=Ink();_guide.rowHeight=UITableViewAutomaticDimension;_guide.estimatedRowHeight=100;_guide.separatorColor=[Gold()colorWithAlphaComponent:.3];[self.view addSubview:_guide];
  _toolbar=[[UIView alloc]init];[self.view addSubview:_toolbar];
  _menu=[self tool:@"☰" action:@selector(menu)];_menu.accessibilityLabel=@"Menu";_save=[self tool:@"Lưu" action:@selector(save)];_load=[self tool:@"Tải" action:@selector(load)];_fusion=[self tool:@"Fusion" action:@selector(cycleFusion)];_fusion.titleLabel.font=[UIFont boldSystemFontOfSize:11];
- _logo=[[LGAutoButton alloc]init];[_logo addTarget:self action:@selector(toggleAuto) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_logo];
+ _logo=[[LGAutoButton alloc]initWithFrame:CGRectZero];[_logo addTarget:self action:@selector(toggleAuto) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_logo];
  _speedButton=[[LGPadButton alloc]init];_speedButton.accessibilityLabel=@"Tốc độ";[_speedButton addTarget:self action:@selector(chooseSpeed) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_speedButton];
  _pads=[NSMutableDictionary dictionary];NSArray* names=@[@"X",@"Vuông",@"Select",@"Start",@"Lên",@"Xuống",@"Trái",@"Phải",@"Tròn",@"Tam giác",@"L1",@"R1",@"L2",@"R2"];
  __weak LGPlayer* weak=self;
@@ -172,7 +172,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  [self smokeProgress:@"settings speed 3"];settings.speed=3;settings.changed(settings);cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];synced=synced&&[self->_speedButton.currentTitle isEqualToString:@"3×"]&&[cell.detailTextLabel.text isEqualToString:@"3×"];
  [self smokeProgress:@"core speed sync"];__block double coreSpeed=0;dispatch_sync(self->_worker,^{coreSpeed=self->_core->playbackRate();});synced=synced&&std::abs(coreSpeed-3)<.001;
  [self setPlaybackSpeed:1];CGRect safe=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);Legend::ControllerGeometry g(safe.size.width,safe.size.height,false);auto fitted=g.fittedGame();BOOL expanded=portrait||(std::abs(fitted.y)<.01&&std::abs(fitted.bottom()-g.toolbar.y)<.01);
- self->_logo.running=YES;[self stopAuto];BOOL ringStopped=!self->_logo.running;
+ self->_logo.running=YES;BOOL ringStarted=self->_logo.hasRunningAnimation&&self->_logo.currentImage!=nil;[self stopAuto];BOOL ringStopped=ringStarted&&!self->_logo.running&&!self->_logo.hasRunningAnimation;
  [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"approved_background_loaded":@([(LGBackdrop*)self.view hasApprovedArtwork]),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"logo_in_toolbar":@(logo),@"speed_text_sync":@(synced),@"speed_button_visibility":@(self->_speedButton.hidden==landscape),@"speed_button_inside_safe_area":@(!portrait||CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped)};
  NSData* json=[NSJSONSerialization dataWithJSONObject:report options:0 error:nil];[json writeToFile:[self->_root stringByAppendingPathComponent:[NSString stringWithFormat:@"simulator_smoke-%@.json",mode]] atomically:YES];
  });

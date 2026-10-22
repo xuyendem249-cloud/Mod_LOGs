@@ -115,7 +115,11 @@ NSAttributedString* LGDescription(GameData& data,int card){
  _track=[CAShapeLayer layer];_track.fillColor=UIColor.clearColor.CGColor;_track.strokeColor=[LGGold()colorWithAlphaComponent:.3].CGColor;_track.lineWidth=2;[self.layer addSublayer:_track];
  _spinner=[CAShapeLayer layer];_spinner.fillColor=UIColor.clearColor.CGColor;_spinner.strokeColor=LGGold().CGColor;_spinner.lineWidth=2;_spinner.lineCap=kCALineCapRound;_spinner.strokeStart=.05;_spinner.strokeEnd=.78;[self.layer addSublayer:_spinner];self.running=NO;
  }return self;}
-- (void)layoutSubviews{[super layoutSubviews];for(CAShapeLayer* layer in @[_track,_spinner]){layer.frame=self.bounds;CGFloat size=MIN(self.bounds.size.width,self.bounds.size.height)-3;CGRect circle=CGRectMake((self.bounds.size.width-size)/2,(self.bounds.size.height-size)/2,size,size);layer.path=[UIBezierPath bezierPathWithOvalInRect:circle].CGPath;}}
+- (void)layoutSubviews{[super layoutSubviews];
+ // UIButton can request layout from its initializer, before our layers exist.
+ if(!_track||!_spinner)return;
+ for(CAShapeLayer* layer in @[_track,_spinner]){layer.frame=self.bounds;CGFloat size=MAX(0,MIN(self.bounds.size.width,self.bounds.size.height)-3);CGRect circle=CGRectMake((self.bounds.size.width-size)/2,(self.bounds.size.height-size)/2,size,size);layer.path=[UIBezierPath bezierPathWithOvalInRect:circle].CGPath;}}
+- (BOOL)hasRunningAnimation{return [_spinner animationForKey:@"auto.rotation"]!=nil;}
 - (void)setRunning:(BOOL)value{_running=value;_track.hidden=_spinner.hidden=!value;self.accessibilityValue=value?@"Đang chạy. Bấm để tắt":@"Tắt. Bấm để bật";if(value){if(![_spinner animationForKey:@"auto.rotation"]){CABasicAnimation* a=[CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];a.fromValue=@0;a.toValue=@(2*std::acos(-1.));a.duration=1.6;a.repeatCount=HUGE_VALF;[_spinner addAnimation:a forKey:@"auto.rotation"];}}else [_spinner removeAnimationForKey:@"auto.rotation"];}
 @end
 

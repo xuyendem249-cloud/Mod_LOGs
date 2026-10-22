@@ -14,6 +14,7 @@ NSAttributedString* LGDescription(Legend::GameData&,int);
 @end
 @interface LGAutoButton:UIButton
 @property(nonatomic) BOOL running;
+@property(nonatomic,readonly) BOOL hasRunningAnimation;
 @end
 @interface LGFusionOverlay:UIView
 - (void)showView:(const Legend::DuelView&)view row:(const Legend::FusionRow*)row;

@@ -1,6 +1,7 @@
 #pragma once
 #import <UIKit/UIKit.h>
 #include "FusionAdvisor.hpp"
+#include "PlaybackSpeed.hpp"
 #include <memory>
 UIColor* LGGold();
 UIColor* LGInk();
@@ -10,6 +11,9 @@ NSString* LGOrder(const std::vector<int>&);
 NSAttributedString* LGDescription(Legend::GameData&,int);
 @interface LGBackdrop:UIView
 @property(nonatomic,readonly) BOOL hasApprovedArtwork;
+@end
+@interface LGAutoButton:UIButton
+@property(nonatomic) BOOL running;
 @end
 @interface LGFusionOverlay:UIView
 - (void)showView:(const Legend::DuelView&)view row:(const Legend::FusionRow*)row;

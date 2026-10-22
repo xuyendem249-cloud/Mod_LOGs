@@ -5,6 +5,7 @@
 #include "libretro.h"
 #include <string>
 #include <map>
+#include <atomic>
 
 namespace Legend {
 // All methods except input/AudioRing are confined to one emulation queue.
@@ -23,6 +24,9 @@ class PlayerCore {
   static int16_t inputState(unsigned,unsigned,unsigned,unsigned);
 public:
   Input input;
+  // Bit 16 enables Auto; lower bits are an ordinary controller mask.
+  std::atomic<uint32_t> autoInput{0};
+  void setAutoMask(uint16_t mask){auto expected=autoInput.load();while((expected&0x10000)&&!autoInput.compare_exchange_weak(expected,0x10000|mask)){};}
   AudioRing audio;
   Frame frame;
   ModCompatibility compatibility;
@@ -39,6 +43,7 @@ public:
   std::vector<uint8_t> ramSnapshot();
   void reset();
   void setSpeed(double value){speed=value>=1&&value<=4?value:1;audioPosition=0;audio.clear();}
+  double playbackRate()const{return speed;}
   std::string coreVersion()const;
   bool isLoaded()const{return loaded;}
 };

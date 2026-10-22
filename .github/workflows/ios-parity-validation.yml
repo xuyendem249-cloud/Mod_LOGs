@@ -1,4 +1,4 @@
-name: Legend iOS 0.3 parity validation
+name: Legend iOS 0.3.2 validation
 on:
   push:
     branches: [codex/ios-parity-03]
@@ -41,7 +41,8 @@ jobs:
           path: |
             build/app-artifacts/
             build/iphonesimulator/simulator_smoke_report.json
-            build/iphonesimulator/background-preview.png
+            build/iphonesimulator/background-portrait.png
+            build/iphonesimulator/background-landscape.png
             build/${{ matrix.sdk }}/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: warn
   portable-tests:

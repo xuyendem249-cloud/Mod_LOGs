@@ -1,7 +1,7 @@
 {
   "name": "Legend Player iOS",
-  "stage": 4,
-  "stage_name": "iOS 0.3.1 Apple build + Simulator passed; device gameplay pending",
+  "stage": 5,
+  "stage_name": "iOS Auto + logo/speed/layout update; Apple build pending",
   "reference_android": "Android 6 / Ver 17",
   "target_device": "iPhone 14",
   "target_ios": "17.6.1",
@@ -16,22 +16,22 @@
   "installable_app_available": false,
   "step1_core_gate_passed": true,
   "step1_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39557932135",
-  "native_app_built_with_apple_sdk": true,
+  "native_app_built_with_apple_sdk": false,
   "step2_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
-  "simulator_smoke_passed": true,
-  "unsigned_ipa_available": true,
+  "simulator_smoke_passed": false,
+  "unsigned_ipa_available": false,
   "signed_for_device": false,
   "testflight_uploaded": false,
   "iphone_runtime_tested": false,
   "vip_fusion_ported": true,
   "mod_compatibility_patches_ported": true,
   "intended_distribution": "TestFlight after native iOS app and signing are ready",
-  "version": "0.3.1",
-  "build": 4,
+  "version": "0.3.2",
+  "build": 5,
   "previous_release": {
-    "version": "0.3.0",
-    "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020",
-    "commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3"
+    "version": "0.3.1",
+    "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39650587896",
+    "commit": "874ecf87ce8127e9aed2537c0409a0864f978bce"
   },
   "step3_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020",
   "step3_commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3",
@@ -44,6 +44,7 @@
   "superseded_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39649047240",
   "step4_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39650587896",
   "step4_commit": "874ecf87ce8127e9aed2537c0409a0864f978bce",
-  "unsigned_ipa": "build/LegendPlayer-iOS-0.3.1-unsigned.ipa",
-  "unsigned_ipa_sha256": "f32fc82b835e0667a9ed0208ee47895e49e5c41e6bf3b14d186cac5e493a66b0"
+  "auto_ported": true,
+  "auto_native_trace_matches_android": true,
+  "quick_speed_button": true
 }

@@ -40,7 +40,7 @@ size_t PlayerCore::batch(const int16_t* data,size_t count){if(active&&data){auto
 void PlayerCore::poll(){}
 int16_t PlayerCore::inputState(unsigned port,unsigned device,unsigned index,unsigned id){
  if(!active||port||index||(device&255)!=RETRO_DEVICE_JOYPAD)return 0;
- uint16_t mask=active->input.mask();return id==RETRO_DEVICE_ID_JOYPAD_MASK?static_cast<int16_t>(mask):id<16?static_cast<int16_t>((mask>>id)&1):0;
+ auto automatic=active->autoInput.load();uint16_t mask=(automatic&0x10000)?uint16_t(automatic):active->input.mask();return id==RETRO_DEVICE_ID_JOYPAD_MASK?static_cast<int16_t>(mask):id<16?static_cast<int16_t>((mask>>id)&1):0;
 }
 bool PlayerCore::open(const std::string& path,const std::string& root,std::string& error){
  close();if(active&&active!=this){error="Core đang được sử dụng.";return false;}
@@ -56,7 +56,7 @@ bool PlayerCore::open(const std::string& path,const std::string& root,std::strin
  return true;
 }
 bool PlayerCore::run(){if(!loaded)return false;changed=false;compatibility.apply(static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM)),retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM));retro_run();input.advance();return changed;}
-void PlayerCore::close(){input.clear();audio.clear();if(loaded){retro_unload_game();loaded=false;}if(initialized){retro_deinit();initialized=false;}if(active==this)active=nullptr;frame=Frame{};}
+void PlayerCore::close(){autoInput.store(0);input.clear();audio.clear();if(loaded){retro_unload_game();loaded=false;}if(initialized){retro_deinit();initialized=false;}if(active==this)active=nullptr;frame=Frame{};}
 std::vector<uint8_t> PlayerCore::saveState(){if(!loaded)return {};size_t n=retro_serialize_size();if(!n||n>64*1024*1024)return {};std::vector<uint8_t> v(n);if(!retro_serialize(v.data(),v.size()))v.clear();return v;}
 bool PlayerCore::loadState(const std::vector<uint8_t>& v){if(!loaded||v.empty()||v.size()>64*1024*1024)return false;input.clear();audio.clear();return retro_unserialize(v.data(),v.size());}
 std::vector<uint8_t> PlayerCore::memoryCard(){if(!loaded)return {};auto* p=static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM));size_t n=retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);if(!p||n!=131072)return {};return {p,p+n};}

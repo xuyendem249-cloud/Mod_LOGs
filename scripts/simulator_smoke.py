@@ -13,14 +13,20 @@ def main():
  try:
   run(['xcrun','simctl','boot',device]);run(['xcrun','simctl','bootstatus',device,'-b'])
   run(['xcrun','simctl','install',device,ROOT/'build/iphonesimulator/Legend.app'])
-  env=dict(os.environ,SIMCTL_CHILD_LEGEND_SMOKE='1')
-  subprocess.run(['xcrun','simctl','launch',device,'vn.anhchugia35.legend'],env=env,check=True)
   from pathlib import Path
   data=Path(capture(['xcrun','simctl','get_app_container',device,'vn.anhchugia35.legend','data']))
-  marker=data/'Documents/Legend/simulator_smoke.json';deadline=time.monotonic()+25
-  while not marker.exists() and time.monotonic()<deadline:time.sleep(.5)
-  report=json.loads(marker.read_text());assert report['app_launched'] and report['all_14_buttons_inside_view'] and report['approved_background_loaded'],report
-  run(['xcrun','simctl','io',device,'screenshot',ROOT/'build/iphonesimulator/background-preview.png'])
+  orientations={}
+  for orientation in ('portrait','landscape'):
+   env=dict(os.environ,SIMCTL_CHILD_LEGEND_SMOKE='1',SIMCTL_CHILD_LEGEND_SMOKE_ORIENTATION=orientation)
+   subprocess.run(['xcrun','simctl','launch',device,'vn.anhchugia35.legend'],env=env,check=True)
+   marker=data/('Documents/Legend/simulator_smoke-'+orientation+'.json');deadline=time.monotonic()+30
+   while not marker.exists() and time.monotonic()<deadline:time.sleep(.5)
+   current=json.loads(marker.read_text())
+   for field in ('app_launched','all_14_buttons_inside_view','approved_background_loaded','orientation_matches','logo_in_toolbar','speed_text_sync','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops'):assert current[field],(orientation,field,current)
+   run(['xcrun','simctl','io',device,'screenshot',ROOT/('build/iphonesimulator/background-'+orientation+'.png')])
+   orientations[orientation]=current
+   subprocess.run(['xcrun','simctl','terminate',device,'vn.anhchugia35.legend'],check=True)
+  report=dict(orientations['portrait'],orientations=orientations)
   (ROOT/'build/iphonesimulator/simulator_smoke_report.json').write_text(json.dumps(report,indent=2));print(report)
  finally:
   subprocess.run(['xcrun','simctl','shutdown',device],check=False);subprocess.run(['xcrun','simctl','delete',device],check=False)

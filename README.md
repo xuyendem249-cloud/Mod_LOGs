@@ -1,4 +1,10 @@
-# Legend Player iOS 0.3.1
+# Legend Player iOS 0.3.2 (build 5)
+
+Bổ sung Auto như Android 8/Ver19, viền logo xoay và tự tắt sau thắng/thua. Dời logo lên thanh Fusion/Lưu/Tải ở cả hai hướng; thêm nút tốc độ đồng bộ ở vị trí logo dọc cũ; tối đa chiều cao game ngang trong safe area, giữ 4:3.
+
+Auto C++ đã qua replay native core riêng với trace trùng Android trong bốn kịch bản (trọn trận, Trap, equip, phòng thủ). Bố cục qua 126 kích thước/chế độ. Apple SDK/Simulator 0.3.2 đang chờ build, chưa có IPA mới và chưa thử gameplay trên iPhone. Xem CAI_DAT_0.3.2.md.
+
+## Bản 0.3.1 trước đó
 
 Đồng bộ sửa tên bài và đánh x2/x3 từ PC Ver 12, cùng Android 6 / Ver 17, cho iPhone 14, iOS 17.6.1. Giữ các chức năng của iOS 0.3; không thêm tool gian lận hoặc sửa BIOS, ISO, save người dùng.
 

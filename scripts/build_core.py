@@ -31,10 +31,11 @@ def build(sdk):
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(ROOT/'Sources/Core'),tests/'frontend_test.cpp','-o',folder/'frontend_test']);run([folder/'frontend_test'])
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(ROOT/'Sources/Core'),tests/'audio_test.cpp','-o',folder/'audio_test']);run([folder/'audio_test'])
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(include),tests/'core_probe.cpp',combined,'-framework','CoreFoundation','-lobjc','-o',folder/'core_probe']);run([folder/'core_probe',folder/'probe-data'])
-  for name in ['compatibility_test','geometry_test']:
+  for name in ['compatibility_test','geometry_test','auto_config_test']:
    run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(ROOT/'Sources/Core'),tests/(name+'.cpp'),'-o',folder/name]);run([folder/name])
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-fsyntax-only','-I'+str(ROOT/'Sources/Core'),ROOT/'Sources/Core/GameData.cpp',ROOT/'Sources/Core/FusionAdvisor.cpp'])
   report['compatibility_guards_passed']=True;report['controller_geometry_passed']=True
+  report['auto_policy_helpers_passed']=True
   report['macos_api_probe_passed']=True;report['frontend_tests_passed']=True
   report['audio_tests_passed']=True
  (folder/'build_report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))

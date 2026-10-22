@@ -1,3 +1,11 @@
+# 0.3.2 (build 5) — 22/10/2026
+
+- Dời logo đỏ lên giữa thanh Fusion/Lưu/Tải ở cả dọc/ngang; bỏ dòng By AnhChuGia35.
+- Logo bật/tắt Auto, viền vàng xoay báo đang chạy. Auto C++ dùng cùng quy tắc với Android 8/Ver19, chọn Fusion/equip/Guardian, đánh/phòng thủ, úp Trap và dùng quái nhỏ dự phòng; tự tắt sau thắng/thua và khi người chơi can thiệp. Chỉ gửi phím, không ghi LP/chỉ số/RAM.
+- Thêm nút tốc độ ở vị trí logo dọc cũ; nhãn 1×/2×/… đồng bộ Cấu hình và core, lưu cùng một giá trị.
+- Thu hẹp hợp lý hai vùng phím ngang để game 4:3 tận dụng chiều cao trên/dưới trong safe area; giữ vị trí phím khi bật/tắt bảng Fusion.
+- Replay native Auto trùng Android ở cả4 kịch bản; bố cục và C++ ARM64 qua kiểm tra cục bộ. Apple SDK/Simulator đang chờ build; gameplay iPhone thật cần kiểm tra.
+
 # 0.3.1 (build 4) — 22/10/2026
 
 - Đồng bộ hai sửa lỗi PC Ver 12: dùng đúng tên bài trong Chest/Deck và giữ danh sách thưởng 15 lá ở đúng màn; sửa load-delay bộ đếm để nhóm x2/x3 đánh đúng giới hạn mỗi lượt.

@@ -6,12 +6,12 @@ def main():
  output=ROOT/('Legend-iOS-'+version+'-source.zip');files=[]
  for folder in ['scripts','Sources','tests','.github','Resources']:
   files.extend(p for p in (ROOT/folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts)
- files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','CAI_DAT_0.3.md','CAI_DAT_0.3.1.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
+ files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','CAI_DAT_0.3.md','CAI_DAT_0.3.1.md','CAI_DAT_0.3.2.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
  files.append(ROOT/'build/local_check_report.json')
  files.append(ROOT/'build/step1_verified_report.json')
  for name in ['native-effects/ios_effects_report.json','native-effects/player_traps_report.json','native-effects/player_summon_destruction_report.json','native-effects/summon_cpp_report.json','parity_check_report.json']:
   if (ROOT/'build'/name).exists():files.append(ROOT/'build'/name)
- for name in ['card-effects/mobile_effects_report.json','card-effects/player_card_effects_report.json','card-effects/player_traps_report.json','card-effects/player_summon_destruction_report.json','verified-'+version+'.json']:
+ for name in ['card-effects/mobile_effects_report.json','card-effects/player_card_effects_report.json','card-effects/player_traps_report.json','card-effects/player_summon_destruction_report.json','auto_test_report.json','verified-'+version+'.json']:
   if (ROOT/'build'/name).exists():files.append(ROOT/'build'/name)
  with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as z:
   for path in sorted(files):

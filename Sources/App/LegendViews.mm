@@ -1,5 +1,6 @@
 #import "LegendViews.hpp"
 #import <QuartzCore/QuartzCore.h>
+#include <cmath>
 #include <algorithm>
 using namespace Legend;
 UIColor* LGGold(){return [UIColor colorWithRed:.96 green:.78 blue:.36 alpha:1];}
@@ -107,15 +108,26 @@ NSAttributedString* LGDescription(GameData& data,int card){
 }
 @end
 
+@implementation LGAutoButton { CAShapeLayer* _spinner; CAShapeLayer* _track; }
+@synthesize running=_running;
+- (instancetype)initWithFrame:(CGRect)frame{if((self=[super initWithFrame:frame])){
+ [self setImage:[UIImage imageNamed:@"AppLogo.png"] forState:UIControlStateNormal];self.imageView.contentMode=UIViewContentModeScaleAspectFit;self.contentEdgeInsets=UIEdgeInsetsMake(3,3,3,3);self.accessibilityLabel=@"Auto";self.accessibilityValue=@"Tắt";
+ _track=[CAShapeLayer layer];_track.fillColor=UIColor.clearColor.CGColor;_track.strokeColor=[LGGold()colorWithAlphaComponent:.3].CGColor;_track.lineWidth=2;[self.layer addSublayer:_track];
+ _spinner=[CAShapeLayer layer];_spinner.fillColor=UIColor.clearColor.CGColor;_spinner.strokeColor=LGGold().CGColor;_spinner.lineWidth=2;_spinner.lineCap=kCALineCapRound;_spinner.strokeStart=.05;_spinner.strokeEnd=.78;[self.layer addSublayer:_spinner];self.running=NO;
+ }return self;}
+- (void)layoutSubviews{[super layoutSubviews];for(CAShapeLayer* layer in @[_track,_spinner]){layer.frame=self.bounds;CGFloat size=MIN(self.bounds.size.width,self.bounds.size.height)-3;CGRect circle=CGRectMake((self.bounds.size.width-size)/2,(self.bounds.size.height-size)/2,size,size);layer.path=[UIBezierPath bezierPathWithOvalInRect:circle].CGPath;}}
+- (void)setRunning:(BOOL)value{_running=value;_track.hidden=_spinner.hidden=!value;self.accessibilityValue=value?@"Đang chạy. Bấm để tắt":@"Tắt. Bấm để bật";if(value){if(![_spinner animationForKey:@"auto.rotation"]){CABasicAnimation* a=[CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];a.fromValue=@0;a.toValue=@(2*std::acos(-1.));a.duration=1.6;a.repeatCount=HUGE_VALF;[_spinner addAnimation:a forKey:@"auto.rotation"];}}else [_spinner removeAnimationForKey:@"auto.rotation"];}
+@end
+
 @implementation LGSettingsController
-- (void)viewDidLoad{[super viewDidLoad];self.title=@"Cấu hình · Legend iOS 0.3.1";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
+- (void)viewDidLoad{[super viewDidLoad];self.title=@"Cấu hình · Legend iOS 0.3.2";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
 - (void)close{[self dismissViewControllerAnimated:YES completion:self.closed];}
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)table{return 3;}
 - (NSInteger)tableView:(UITableView*)table numberOfRowsInSection:(NSInteger)section{return section==0?4:section==1?6:1;}
 - (NSString*)tableView:(UITableView*)table titleForHeaderInSection:(NSInteger)section{return @[@"Hình gốc 4:3 · tự xoay dọc/ngang",@"BIOS & thẻ nhớ",@"Mã nguồn và giấy phép"][section];}
 - (UITableViewCell*)tableView:(UITableView*)table cellForRowAtIndexPath:(NSIndexPath*)p{
  UITableViewCell* c=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];c.backgroundColor=[UIColor colorWithRed:.14 green:.09 blue:.22 alpha:1];c.textLabel.textColor=UIColor.whiteColor;c.detailTextLabel.textColor=LGGold();c.textLabel.font=[UIFont systemFontOfSize:14];
- if(p.section==0){c.textLabel.text=@[@"Fusion",@"Tốc độ",@"Slot lưu nhanh",@"Âm lượng"][p.row];c.detailTextLabel.text=p.row==0?@[@"Tắt",@"Chỉ số thứ tự",@"Số + hướng dẫn"][self.fusionMode]:p.row==1?[NSString stringWithFormat:@"%.2g×",self.speed]:p.row==2?[NSString stringWithFormat:@"%ld / 10",(long)self.slot]:@"";if(p.row==3){UISlider* s=[[UISlider alloc]initWithFrame:CGRectMake(0,0,170,32)];s.minimumValue=0;s.maximumValue=1;s.value=self.volume;[s addTarget:self action:@selector(volumeChanged:) forControlEvents:UIControlEventValueChanged];c.accessoryView=s;}}
+ if(p.section==0){c.textLabel.text=@[@"Fusion",@"Tốc độ",@"Slot lưu nhanh",@"Âm lượng"][p.row];c.detailTextLabel.text=p.row==0?@[@"Tắt",@"Chỉ số thứ tự",@"Số + hướng dẫn"][self.fusionMode]:p.row==1?LGText(Legend::playbackSpeedText(self.speed)):p.row==2?[NSString stringWithFormat:@"%ld / 10",(long)self.slot]:@"";if(p.row==3){UISlider* s=[[UISlider alloc]initWithFrame:CGRectMake(0,0,170,32)];s.minimumValue=0;s.maximumValue=1;s.value=self.volume;[s addTarget:self action:@selector(volumeChanged:) forControlEvents:UIControlEventValueChanged];c.accessoryView=s;}}
  else if(p.section==1)c.textLabel.text=@[@"Nhập BIOS 512 KB",@"Nhập thẻ nhớ RAW 128 KB",@"Xuất thẻ nhớ",@"Khởi động lại game",@"Lưu vào slot hiện tại",@"Tải slot hiện tại"][p.row];else c.textLabel.text=@"SwanStation · mã nguồn · giấy phép";return c;
 }
 - (void)volumeChanged:(UISlider*)s{self.volume=s.value;if(self.changed)self.changed(self);}

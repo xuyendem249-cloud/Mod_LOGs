@@ -1,8 +1,8 @@
 {
   "name": "Legend Player iOS",
   "stage": 5,
-  "stage_name": "iOS Auto + logo/speed/layout update; Apple build pending",
-  "reference_android": "Android 6 / Ver 17",
+  "stage_name": "Larger circular Auto logo; Apple validation pending",
+  "reference_android": "Android 8 / Ver 19 (includes Android 6 / Ver 17 compatibility fixes)",
   "target_device": "iPhone 14",
   "target_ios": "17.6.1",
   "minimum_ios": "17.0",
@@ -26,12 +26,12 @@
   "vip_fusion_ported": true,
   "mod_compatibility_patches_ported": true,
   "intended_distribution": "TestFlight after native iOS app and signing are ready",
-  "version": "0.3.2",
-  "build": 5,
+  "version": "0.3.3",
+  "build": 6,
   "previous_release": {
-    "version": "0.3.1",
-    "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39650587896",
-    "commit": "874ecf87ce8127e9aed2537c0409a0864f978bce"
+    "version": "0.3.2",
+    "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976",
+    "commit": "57d12e00e5ed1fc014cdb7780c52ee0f1eca8464"
   },
   "step3_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020",
   "step3_commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3",
@@ -46,5 +46,8 @@
   "step4_commit": "874ecf87ce8127e9aed2537c0409a0864f978bce",
   "auto_ported": true,
   "auto_native_trace_matches_android": true,
-  "quick_speed_button": true
+  "quick_speed_button": true,
+  "step5_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976",
+  "step5_commit": "57d12e00e5ed1fc014cdb7780c52ee0f1eca8464",
+  "circular_auto_logo": true
 }

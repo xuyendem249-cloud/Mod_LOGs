@@ -1,10 +1,10 @@
 # Bổ sung iOS 0.3.2
 
-Auto theo Android 8/Ver19 đã chuyển sang C++ và chạy qua cùng native core oracle, trace trùng từng bước ở bốn kịch bản. Điều khiển thật gửi qua mask nguyên tử riêng, người chơi chạm nút sẽ tắt Auto; không sửa trạng thái game. Nút tốc độ và Cấu hình dùng chung bộ giá trị/formatter. Bản này vẫn cần kiểm tra Apple SDK và gameplay iPhone sau cài.
+Auto theo Android 8/Ver19 đã chuyển sang C++ và chạy qua cùng native core oracle, trace trùng từng bước ở bốn kịch bản. Điều khiển thật gửi qua mask nguyên tử riêng, người chơi chạm nút sẽ tắt Auto; không sửa trạng thái game. Nút tốc độ và Cấu hình dùng chung bộ giá trị/formatter. Bản 0.3.2 đã qua Apple SDK iPhone/Simulator và kiểm tra giao diện hai hướng: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976. Nguồn/tài nguyên khớp artifact; logo/viền Auto, đồng bộ tốc độ với core và khoảng cao màn hình ngang đã được xác minh. Gameplay iPhone vẫn cần kiểm tra sau cài.
 
 # iOS 0.3.1 — bổ sung sau Android 6 / Ver 17
 
-Bản 0.3.1 build 4 đã qua Apple SDK và Simulator ở run 39650587896, commit 874ecf87ce8127e9aed2537c0409a0864f978bce. Bổ sung hai sửa lỗi tên bài/x2/x3 của PC Ver12 và nền Trò chơi Ngàn năm được duyệt. Ảnh nền đóng trong IPA khớp byte với nguồn và Simulator đã báo tải thành công. Chưa kiểm tra chơi game/BIOS trên iPhone thật; IPA cần ký lại bằng Sideloadly. Auto mới của Android 8 chưa được yêu cầu chuyển sang iOS.
+Bản 0.3.1 build 4 đã qua Apple SDK và Simulator ở run 39650587896, commit 874ecf87ce8127e9aed2537c0409a0864f978bce. Bổ sung hai sửa lỗi tên bài/x2/x3 của PC Ver12 và nền Trò chơi Ngàn năm được duyệt. Ảnh nền đóng trong IPA khớp byte với nguồn và Simulator đã báo tải thành công. Chưa kiểm tra chơi game/BIOS trên iPhone thật; IPA cần ký lại bằng Sideloadly. Auto Android 8 được chuyển sang iOS ở bản 0.3.2 theo yêu cầu tiếp theo.
 
 # Legend iOS 0.3 — đối chiếu Android 5 / Ver 16
 

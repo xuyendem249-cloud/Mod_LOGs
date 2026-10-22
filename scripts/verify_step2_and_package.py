@@ -72,11 +72,11 @@ def main(directory,app_version,source_run):
      executable=app.read('Legend.app/Legend');assert sha(executable)==report['executable_sha256']
      info=plistlib.loads(app.read('Legend.app/Info.plist'));binary=macho(executable)
      assert info['CFBundleShortVersionString']==app_version,'Artifact is not the requested app version'
-     if app_version in ('0.3.0','0.3.1','0.3.2'):
+     if app_version in ('0.3.0','0.3.1','0.3.2','0.3.3'):
       assert report['stage']==3 and report['app_version']==app_version
       assert any('/GameController.framework/' in name for name in binary['linked_libraries'])
       assert {'Legend.app/welcome.png','Legend.app/LICENSES.txt'}.issubset(app.namelist())
-     if app_version in ('0.3.1','0.3.2'):
+     if app_version in ('0.3.1','0.3.2','0.3.3'):
       assert app.read('Legend.app/DuelTemple-v1.png')==(ROOT/'Resources/DuelTemple-v1.png').read_bytes()
      assert info['CFBundleIdentifier']=='vn.anhchugia35.legend' and info['CFBundleExecutable']=='Legend'
      assert info['MinimumOSVersion']=='17.0' and binary['minimum_os']=='17.0.0'
@@ -92,10 +92,12 @@ def main(directory,app_version,source_run):
     if sdk=='iphonesimulator':
      smoke=json.loads(outer.read('iphonesimulator/simulator_smoke_report.json'))
      assert smoke['app_launched'] and smoke['all_14_buttons_inside_view'] and not smoke['game_or_bios_tested']
-     if app_version in ('0.3.1','0.3.2'):assert smoke['approved_background_loaded']
-     if app_version=='0.3.2':
+     if app_version in ('0.3.1','0.3.2','0.3.3'):assert smoke['approved_background_loaded']
+     if app_version in ('0.3.2','0.3.3'):
       for mode in ('portrait','landscape'):
        for key in ('orientation_matches','logo_in_toolbar','speed_text_sync','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops'):assert smoke['orientations'][mode][key],(mode,key)
+     if app_version=='0.3.3':
+      for mode in ('portrait','landscape'):assert smoke['orientations'][mode]['large_circular_logo']
      item['simulator_smoke']=smoke
    shutil.copyfile(path,output/path.name);reports.append(item)
  assert device_app is not None
@@ -115,4 +117,4 @@ def main(directory,app_version,source_run):
  result={'source_run':source_run,'app_version':app_version,'verified_artifacts':reports,'unsigned_ipa':str(ipa.relative_to(ROOT)),'ipa_sha256':sha(ipa.read_bytes()),'ipa_bytes':ipa.stat().st_size,'debug_symbols_excluded':excluded,'signed_for_device':False,'installable_without_signing':False,'iphone_runtime_tested':False,'game_or_bios_tested':False,'testflight_uploaded':False}
  (ROOT/('build/verified-'+app_version+'.json')).write_text(json.dumps(result,indent=2));print(json.dumps({k:v for k,v in result.items() if k!='verified_artifacts'},indent=2))
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('directory');p.add_argument('--version',default='0.3.2',choices=['0.2.0','0.3.0','0.3.1','0.3.2']);p.add_argument('--run',required=True);args=p.parse_args();main(args.directory,args.version,args.run)
+ p=argparse.ArgumentParser();p.add_argument('directory');p.add_argument('--version',default='0.3.3',choices=['0.2.0','0.3.0','0.3.1','0.3.2','0.3.3']);p.add_argument('--run',required=True);args=p.parse_args();main(args.directory,args.version,args.run)

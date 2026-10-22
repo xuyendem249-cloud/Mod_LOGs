@@ -28,7 +28,7 @@ def main():
     for progress in (data/'Documents/Legend').glob('smoke-progress*'):print(progress.name,progress.read_text())
     raise RuntimeError('App did not finish '+orientation+' smoke within 120 seconds; runtime log and screenshot preserved')
    current=json.loads(marker.read_text())
-   for field in ('app_launched','all_14_buttons_inside_view','approved_background_loaded','orientation_matches','logo_in_toolbar','speed_text_sync','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops'):assert current[field],(orientation,field,current)
+   for field in ('app_launched','all_14_buttons_inside_view','approved_background_loaded','orientation_matches','logo_in_toolbar','speed_text_sync','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops','large_circular_logo'):assert current[field],(orientation,field,current)
    run(['xcrun','simctl','io',device,'screenshot',ROOT/('build/iphonesimulator/background-'+orientation+'.png')])
    orientations[orientation]=current
    subprocess.run(['xcrun','simctl','terminate',device,'vn.anhchugia35.legend'],check=True)

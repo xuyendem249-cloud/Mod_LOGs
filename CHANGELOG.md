@@ -1,10 +1,16 @@
+# 0.3.3 (build 6) — 22/10/2026
+
+- Phóng lớn logo Auto: khung 46 pt dọc / 44 pt ngang, cao cân với các nút thanh công cụ; ảnh bên trong lớn hơn khoảng 40%.
+- Cắt hiển thị tròn cả ảnh và nút, không sửa ảnh/nền gốc. Giữ viền xoay riêng bên ngoài.
+- Giữ Auto, tốc độ đồng bộ và màn hình ngang 4:3 đầy chiều cao có thể; đang chờ kiểm tra Apple SDK.
+
 # 0.3.2 (build 5) — 22/10/2026
 
 - Dời logo đỏ lên giữa thanh Fusion/Lưu/Tải ở cả dọc/ngang; bỏ dòng By AnhChuGia35.
 - Logo bật/tắt Auto, viền vàng xoay báo đang chạy. Auto C++ dùng cùng quy tắc với Android 8/Ver19, chọn Fusion/equip/Guardian, đánh/phòng thủ, úp Trap và dùng quái nhỏ dự phòng; tự tắt sau thắng/thua và khi người chơi can thiệp. Chỉ gửi phím, không ghi LP/chỉ số/RAM.
 - Thêm nút tốc độ ở vị trí logo dọc cũ; nhãn 1×/2×/… đồng bộ Cấu hình và core, lưu cùng một giá trị.
 - Thu hẹp hợp lý hai vùng phím ngang để game 4:3 tận dụng chiều cao trên/dưới trong safe area; giữ vị trí phím khi bật/tắt bảng Fusion.
-- Replay native Auto trùng Android ở cả4 kịch bản; bố cục và C++ ARM64 qua kiểm tra cục bộ. Apple SDK/Simulator đang chờ build; gameplay iPhone thật cần kiểm tra.
+- Replay native Auto trùng Android ở cả4 kịch bản; bố cục và C++ ARM64 qua kiểm tra cục bộ. Apple SDK/Simulator đã qua cả ba job ở run 39703895976; kiểm tra logo, viền Auto, tốc độ và bố cục ở cả dọc/ngang thành công. Gameplay iPhone thật cần kiểm tra.
 
 # 0.3.1 (build 4) — 22/10/2026
 

@@ -111,20 +111,22 @@ NSAttributedString* LGDescription(GameData& data,int card){
 @implementation LGAutoButton { CAShapeLayer* _spinner; CAShapeLayer* _track; }
 @synthesize running=_running;
 - (instancetype)initWithFrame:(CGRect)frame{if((self=[super initWithFrame:frame])){
- [self setImage:[UIImage imageNamed:@"AppLogo.png"] forState:UIControlStateNormal];self.imageView.contentMode=UIViewContentModeScaleAspectFit;self.contentEdgeInsets=UIEdgeInsetsMake(3,3,3,3);self.accessibilityLabel=@"Auto";self.accessibilityValue=@"Tắt";
+ [self setImage:[UIImage imageNamed:@"AppLogo.png"] forState:UIControlStateNormal];self.imageView.contentMode=UIViewContentModeScaleAspectFill;self.imageView.clipsToBounds=YES;self.clipsToBounds=YES;self.contentEdgeInsets=UIEdgeInsetsZero;self.accessibilityLabel=@"Auto";self.accessibilityValue=@"Tắt";
  _track=[CAShapeLayer layer];_track.fillColor=UIColor.clearColor.CGColor;_track.strokeColor=[LGGold()colorWithAlphaComponent:.3].CGColor;_track.lineWidth=2;[self.layer addSublayer:_track];
  _spinner=[CAShapeLayer layer];_spinner.fillColor=UIColor.clearColor.CGColor;_spinner.strokeColor=LGGold().CGColor;_spinner.lineWidth=2;_spinner.lineCap=kCALineCapRound;_spinner.strokeStart=.05;_spinner.strokeEnd=.78;[self.layer addSublayer:_spinner];self.running=NO;
  }return self;}
-- (void)layoutSubviews{[super layoutSubviews];
+- (CGRect)imageRectForContentRect:(CGRect)rect{CGFloat size=MAX(0,MIN(rect.size.width,rect.size.height)-6);return CGRectMake(CGRectGetMidX(rect)-size/2,CGRectGetMidY(rect)-size/2,size,size);}
+- (void)layoutSubviews{[super layoutSubviews];self.layer.cornerRadius=MIN(self.bounds.size.width,self.bounds.size.height)/2;self.imageView.layer.cornerRadius=MIN(self.imageView.bounds.size.width,self.imageView.bounds.size.height)/2;
  // UIButton can request layout from its initializer, before our layers exist.
  if(!_track||!_spinner)return;
  for(CAShapeLayer* layer in @[_track,_spinner]){layer.frame=self.bounds;CGFloat size=MAX(0,MIN(self.bounds.size.width,self.bounds.size.height)-3);CGRect circle=CGRectMake((self.bounds.size.width-size)/2,(self.bounds.size.height-size)/2,size,size);layer.path=[UIBezierPath bezierPathWithOvalInRect:circle].CGPath;}}
 - (BOOL)hasRunningAnimation{return [_spinner animationForKey:@"auto.rotation"]!=nil;}
+- (BOOL)hasCircularImage{return self.currentImage!=nil&&self.clipsToBounds&&self.imageView.clipsToBounds&&self.imageView.bounds.size.width>0&&std::abs(self.imageView.bounds.size.width-self.imageView.bounds.size.height)<.01&&std::abs(self.imageView.layer.cornerRadius-self.imageView.bounds.size.width/2)<.01;}
 - (void)setRunning:(BOOL)value{_running=value;_track.hidden=_spinner.hidden=!value;self.accessibilityValue=value?@"Đang chạy. Bấm để tắt":@"Tắt. Bấm để bật";if(value){if(![_spinner animationForKey:@"auto.rotation"]){CABasicAnimation* a=[CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];a.fromValue=@0;a.toValue=@(2*std::acos(-1.));a.duration=1.6;a.repeatCount=HUGE_VALF;[_spinner addAnimation:a forKey:@"auto.rotation"];}}else [_spinner removeAnimationForKey:@"auto.rotation"];}
 @end
 
 @implementation LGSettingsController
-- (void)viewDidLoad{[super viewDidLoad];self.title=@"Cấu hình · Legend iOS 0.3.2";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
+- (void)viewDidLoad{[super viewDidLoad];self.title=@"Cấu hình · Legend iOS 0.3.3";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
 - (void)close{[self dismissViewControllerAnimated:YES completion:self.closed];}
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)table{return 3;}
 - (NSInteger)tableView:(UITableView*)table numberOfRowsInSection:(NSInteger)section{return section==0?4:section==1?6:1;}

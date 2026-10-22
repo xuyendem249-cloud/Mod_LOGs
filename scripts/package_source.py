@@ -6,7 +6,7 @@ def main():
  output=ROOT/('Legend-iOS-'+version+'-source.zip');files=[]
  for folder in ['scripts','Sources','tests','.github','Resources']:
   files.extend(p for p in (ROOT/folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts)
- files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','CAI_DAT_0.3.md','CAI_DAT_0.3.1.md','CAI_DAT_0.3.2.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
+ files.extend(ROOT/name for name in ['README.md','CHANGELOG.md','PARITY.md','CAI_DAT_0.3.md','CAI_DAT_0.3.1.md','CAI_DAT_0.3.2.md','CAI_DAT_0.3.3.md','project.json','sources.lock.json','.gitignore','THIRD_PARTY.md'])
  files.append(ROOT/'build/local_check_report.json')
  files.append(ROOT/'build/step1_verified_report.json')
  for name in ['native-effects/ios_effects_report.json','native-effects/player_traps_report.json','native-effects/player_summon_destruction_report.json','native-effects/summon_cpp_report.json','parity_check_report.json']:

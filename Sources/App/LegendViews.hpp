@@ -15,6 +15,7 @@ NSAttributedString* LGDescription(Legend::GameData&,int);
 @interface LGAutoButton:UIButton
 @property(nonatomic) BOOL running;
 @property(nonatomic,readonly) BOOL hasRunningAnimation;
+@property(nonatomic,readonly) BOOL hasCircularImage;
 @end
 @interface LGFusionOverlay:UIView
 - (void)showView:(const Legend::DuelView&)view row:(const Legend::FusionRow*)row;

@@ -1,8 +1,18 @@
-# Legend Player iOS 0.3.2 (build 5)
+# Legend Player iOS 0.3.3 (build 6)
+
+Phóng lớn logo Auto ở cả dọc/ngang, cắt hình tròn hoàn toàn bằng giao diện, giữ nguyên ảnh và viền xoay. Đang chờ Apple SDK/Simulator xác minh; chưa có IPA 0.3.3.
+
+## Bản 0.3.2 (build 5)
 
 Bổ sung Auto như Android 8/Ver19, viền logo xoay và tự tắt sau thắng/thua. Dời logo lên thanh Fusion/Lưu/Tải ở cả hai hướng; thêm nút tốc độ đồng bộ ở vị trí logo dọc cũ; tối đa chiều cao game ngang trong safe area, giữ 4:3.
 
-Auto C++ đã qua replay native core riêng với trace trùng Android trong bốn kịch bản (trọn trận, Trap, equip, phòng thủ). Bố cục qua 126 kích thước/chế độ. Apple SDK/Simulator 0.3.2 đang chờ build, chưa có IPA mới và chưa thử gameplay trên iPhone. Xem CAI_DAT_0.3.2.md.
+Auto C++ đã qua replay native core riêng với trace trùng Android trong bốn kịch bản (trọn trận, Trap, equip, phòng thủ). Bố cục qua 126 kích thước/chế độ. Apple SDK cho iPhone/Simulator và kiểm tra giao diện dọc/ngang đã qua cả ba job. Đã đóng gói IPA 0.3.2 chưa ký; chưa thử gameplay trên iPhone thật. Xem [CAI_DAT_0.3.2.md](CAI_DAT_0.3.2.md).
+
+Lượt 0.3.2: https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976
+Commit: `57d12e00e5ed1fc014cdb7780c52ee0f1eca8464`.
+IPA: `build/LegendPlayer-iOS-0.3.2-unsigned.ipa`.
+SHA-256: `3a110281a3cebd98cf9c9744f70d3c8a9a8c92c699b831b8e4857e2fc138337f`.
+Báo cáo: `build/verified-0.3.2.json`.
 
 ## Bản 0.3.1 trước đó
 
@@ -49,8 +59,8 @@ Windows: `scripts/local_checks.py` kiểm tra nguồn/ARM64 syntax.
 test trap/destruction PS1 load-delay. Báo cáo nằm trong build/native-effects.
 
 Giữ tên artifact `Legend-Step2-*` để tương thích workflow hiện có. Xác minh
-phiên bản trong Info.plist/app_build_report.json trước khi đóng gói IPA 0.3.1.
-Source ZIP mới: `Legend-iOS-0.3.1-source.zip`. Không dùng IPA 0.2 làm bản sửa.
+phiên bản trong Info.plist/app_build_report.json trước khi đóng gói IPA 0.3.2.
+Source ZIP mới: `Legend-iOS-0.3.2-source.zip`. Không dùng IPA 0.2 làm bản sửa.
 
 ## Cài cập nhật
 

@@ -39,6 +39,33 @@ else()
 endif()
 add_library(swanstation_libretro ${LEGEND_CORE_TYPE}''')
  replace('src/libretro/CMakeLists.txt','set_target_properties(swanstation_libretro PROPERTIES PREFIX "")','set_target_properties(swanstation_libretro PROPERTIES PREFIX "" ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")')
+ pad='src/core/pad.h'
+ replace(pad,'  ALWAYS_INLINE bool IsTransmitting() const { return m_state != State::Idle; }','''  ALWAYS_INLINE bool IsTransmitting() const { return m_state != State::Idle; }
+  bool CanReplaceMemoryCard() const
+  {
+    return !IsTransmitting() && m_active_device != ActiveDevice::MemoryCard &&
+           m_active_device != ActiveDevice::Multitap;
+  }''')
+ host='src/libretro/libretro_host_interface.cpp'
+ replace(host,'#include "core/pad.h"','#include "core/memory_card.h"\n#include "core/pad.h"')
+ replace(host,'RETRO_API void* retro_get_memory_data(unsigned id)', '''// The frontend calls this on the emulation queue between frames.
+extern "C" bool legend_replace_memory_card(const uint8_t* bytes, size_t size)
+{
+  if (!bytes || size != 128 * 1024 || bytes[0] != 'M' || bytes[1] != 'C' ||
+      System::IsShutdown() || g_settings.memory_card_types[0] != MemoryCardType::Libretro ||
+      !g_pad.GetMemoryCard(0) || !g_pad.CanReplaceMemoryCard())
+    return false;
+
+  auto replacement = MemoryCard::Create();
+  if (!replacement)
+    return false;
+  replacement->Reset();
+  std::memcpy(replacement->GetData().data(), bytes, size);
+  g_pad.SetMemoryCard(0, std::move(replacement));
+  return true;
+}
+
+RETRO_API void* retro_get_memory_data(unsigned id)''')
  # shm_open is not a supported iOS sandbox allocation strategy. Keep mmap views,
  # but back the arena with an unlinked file inside this app's temporary directory.
  replace('src/common/memory_arena.cpp','#include "memory_arena.h"','#include "memory_arena.h"\n#include <cstdlib>\n#include <vector>')
@@ -62,7 +89,7 @@ add_library(swanstation_libretro ${LEGEND_CORE_TYPE}''')
 #elif defined(_WIN32)
   const DWORD protect''')
  return files
-PATCH_PATHS=['CMakeLists.txt','src/core/CMakeLists.txt','dep/CMakeLists.txt','src/common/CMakeLists.txt','src/libretro/CMakeLists.txt','src/common/memory_arena.cpp']
+PATCH_PATHS=['CMakeLists.txt','src/core/CMakeLists.txt','dep/CMakeLists.txt','src/common/CMakeLists.txt','src/libretro/CMakeLists.txt','src/common/memory_arena.cpp','src/libretro/libretro_host_interface.cpp','src/core/pad.h']
 def prepare(source=None):
  lock=json.loads((ROOT/'sources.lock.json').read_text());source=Path(source or ROOT/'vendor/swanstation')
  if not source.exists():

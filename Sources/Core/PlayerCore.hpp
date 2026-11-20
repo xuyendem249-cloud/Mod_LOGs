@@ -40,6 +40,7 @@ public:
   bool loadState(const std::vector<uint8_t>& state);
   std::vector<uint8_t> memoryCard();
   bool setMemoryCard(const std::vector<uint8_t>& bytes);
+  bool replaceMemoryCard(const uint8_t* bytes,size_t size);
   std::vector<uint8_t> ramSnapshot();
   void reset();
   void setSpeed(double value){speed=value>=1&&value<=4?value:1;audioPosition=0;audio.clear();}

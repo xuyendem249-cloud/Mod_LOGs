@@ -120,7 +120,10 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  NSString* docs=NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES).firstObject;_root=[docs stringByAppendingPathComponent:@"Legend"];
  for(NSString* name in @[@"system",@"saves",@"content"]) [[NSFileManager defaultManager] createDirectoryAtPath:[_root stringByAppendingPathComponent:name] withIntermediateDirectories:YES attributes:nil error:nil];
  _screen=[[UIImageView alloc]init];_screen.backgroundColor=UIColor.blackColor;_screen.contentMode=UIViewContentModeScaleToFill;_screen.layer.magnificationFilter=kCAFilterNearest;_screen.clipsToBounds=YES;[self.view addSubview:_screen];
- _placeholder=[[UILabel alloc]init];_placeholder.text=@"LEGEND\n\nMở menu ☰ để nhập BIOS và chọn game\nLegend Player iOS 0.3.3";_placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
+ _placeholder=[[UILabel alloc]init];
+ NSString* version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+ _placeholder.text=[NSString stringWithFormat:@"LEGEND\n\nMở menu ☰ để nhập BIOS và chọn game\nLegend Player iOS %@",version];
+ _placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
  _welcome=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"welcome.png"]];_welcome.contentMode=UIViewContentModeScaleAspectFit;[_screen addSubview:_welcome];
  _overlay=[[LGFusionOverlay alloc]init];[_screen addSubview:_overlay];
  _guide=[[UITableView alloc]initWithFrame:CGRectZero style:UITableViewStylePlain];_guide.dataSource=self;_guide.delegate=self;_guide.backgroundColor=Ink();_guide.rowHeight=UITableViewAutomaticDimension;_guide.estimatedRowHeight=100;_guide.separatorColor=[Gold()colorWithAlphaComponent:.3];[self.view addSubview:_guide];
@@ -307,13 +310,46 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (void)command:(NSString*)command{
  if([command isEqualToString:@"bios"]){[self pick:YES];return;}if([command isEqualToString:@"license"]){NSString* path=[NSBundle.mainBundle pathForResource:@"LICENSES" ofType:@"txt"];NSString* text=[NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil]?:@"SwanStation — GPLv3\nMã nguồn: https://github.com/xuyendem249-cloud/Mod_LOGs";UIViewController* vc=[[UIViewController alloc]init];vc.title=@"Mã nguồn & giấy phép";UITextView* view=[[UITextView alloc]init];view.text=text;view.editable=NO;view.backgroundColor=Ink();view.textColor=UIColor.whiteColor;view.font=[UIFont systemFontOfSize:13];vc.view=view;vc.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(closeDocument)];UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:vc];nav.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:nav animated:YES completion:nil];return;}
- if(!_ready){[self alert:@"Chưa mở game" text:@"Hãy mở đúng game trước."];return;}if([command isEqualToString:@"save"]){[self save];return;}if([command isEqualToString:@"load"]){[self load];return;}if([command isEqualToString:@"cardIn"]){[self confirm:@"Nhập thẻ nhớ?" text:@"Sao lưu thẻ hiện tại rồi thay bằng file RAW 128 KB. Game sẽ khởi động lại." action:^{[self pickMode:2];}];return;}if([command isEqualToString:@"cardOut"]){[self exportCard];return;}
+ if(!_ready){[self alert:@"Chưa mở game" text:@"Hãy mở đúng game trước."];return;}if([command isEqualToString:@"save"]){[self save];return;}if([command isEqualToString:@"load"]){[self load];return;}if([command isEqualToString:@"cardIn"]){[self confirm:@"Nhập thẻ nhớ?" text:@"Chọn tệp thẻ nhớ RAW 128 KB. Game sẽ tiếp tục ở màn hình hiện tại." action:^{[self pickMode:2];}];return;}if([command isEqualToString:@"cardOut"]){[self exportCard];return;}
  if([command isEqualToString:@"reset"])[self confirm:@"Khởi động lại game?" text:@"Thẻ nhớ được lưu trước khi khởi động lại. Tiến trình chưa lưu trong game sẽ mất." action:^{++self->_generation;self->_lastRam.reset();self->_operation=YES;dispatch_async(self->_worker,^{[self persistCard];self->_core->reset();dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;self->_duel={};self->_hasSelected=NO;[self->_overlay showView:self->_duel row:nullptr];[self resumePlayback];});});}];
 }
 - (void)closeDocument{[self dismissViewControllerAnimated:YES completion:^{[self resumePlayback];}];}
 - (void)confirm:(NSString*)title text:(NSString*)text action:(void(^)(void))callback{UIAlertController* a=[UIAlertController alertControllerWithTitle:title message:text preferredStyle:UIAlertControllerStyleAlert];[a addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[self resumePlayback];}]];[a addAction:[UIAlertAction actionWithTitle:@"Tiếp tục" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){callback();}]];[self presentViewController:a animated:YES completion:nil];}
 - (void)importCardURL:(NSURL*)url{
- if(!url){_operation=NO;[self resumePlayback];return;}++_generation;_lastRam.reset();_operation=YES;dispatch_async(_worker,^{BOOL scope=[url startAccessingSecurityScopedResource];__block NSData* bytes=nil;NSFileCoordinator* coordinator=[[NSFileCoordinator alloc]init];NSError* error=nil;[coordinator coordinateReadingItemAtURL:url options:0 error:&error byAccessor:^(NSURL* location){NSDictionary* info=[NSFileManager.defaultManager attributesOfItemAtPath:location.path error:nil];if(info.fileSize==131072)bytes=[NSData dataWithContentsOfURL:location];}];if(scope)[url stopAccessingSecurityScopedResource];BOOL ok=bytes.length==131072&&((const uint8_t*)bytes.bytes)[0]=='M'&&((const uint8_t*)bytes.bytes)[1]=='C';if(ok){[self persistCard];BOOL backed=[self backup:[self cardPath]];const uint8_t* b=(const uint8_t*)bytes.bytes;ok=backed&&self->_core->setMemoryCard({b,b+bytes.length});if(ok){[self persistCard];self->_core->reset();}}dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;[self alert:ok?@"Đã nhập thẻ nhớ":@"Không nhập được thẻ nhớ" text:ok?@"Chọn LOAD trong game.":@"Chỉ nhận thẻ nhớ RAW .mcr/.mcd đúng 128 KB, có chữ ký MC."];});});
+ if(!url){_operation=NO;[self resumePlayback];return;}
+ ++_generation;_lastRam.reset();_operation=YES;
+ dispatch_async(_worker,^{
+  const BOOL scope=[url startAccessingSecurityScopedResource];
+  __block NSData* bytes=nil;
+  NSFileCoordinator* coordinator=[[NSFileCoordinator alloc]init];
+  NSError* error=nil;
+  [coordinator coordinateReadingItemAtURL:url options:0 error:&error byAccessor:^(NSURL* location){
+   NSDictionary* info=[NSFileManager.defaultManager attributesOfItemAtPath:location.path error:nil];
+   if(info.fileSize==131072)bytes=[NSData dataWithContentsOfURL:location];
+  }];
+  if(scope)[url stopAccessingSecurityScopedResource];
+  const auto* incoming=static_cast<const uint8_t*>(bytes.bytes);
+  NSString* issue=nil;
+  if(bytes.length!=131072||incoming[0]!='M'||incoming[1]!='C'){
+   issue=error.localizedDescription?:@"Chọn thẻ nhớ RAW .mcr/.mcd đúng 128 KB, có chữ ký MC.";
+  }else{
+   const auto previous=self->_core->memoryCard();
+   NSString* path=[self cardPath];
+   NSData* backup=[NSData dataWithBytes:previous.data() length:previous.size()];
+   if(previous.size()!=131072||![backup writeToFile:[path stringByAppendingString:@".bak"] options:NSDataWritingAtomic error:&error]){
+    issue=error.localizedDescription?:@"Không sao lưu được thẻ hiện tại.";
+   }else if(!self->_core->replaceMemoryCard(incoming,bytes.length)){
+    issue=@"Game đang dùng cổng thẻ nhớ. Quay lại game và thử nhập lại sau khi thao tác lưu hoặc tải kết thúc.";
+   }else if(![bytes writeToFile:path options:NSDataWritingAtomic error:&error]){
+    const bool restored=self->_core->replaceMemoryCard(previous.data(),previous.size());
+    issue=restored?(error.localizedDescription?:@"Không ghi được thẻ mới."):@"Không ghi được thẻ mới. Bản sao thẻ trước vẫn còn trong thư mục saves.";
+   }
+  }
+  dispatch_async(dispatch_get_main_queue(),^{
+   self->_operation=NO;
+   [self alert:issue?@"Không nhập được thẻ nhớ":@"Đã nhập thẻ nhớ" text:issue?:@"Có thể chọn LOAD trong game khi bạn sẵn sàng."];
+  });
+ });
 }
 - (void)exportCard{_operation=YES;dispatch_async(_worker,^{[self persistCard];auto card=self->_core->memoryCard();NSString* directory=[self->_root stringByAppendingPathComponent:@"exports"];[NSFileManager.defaultManager createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];NSString* path=[directory stringByAppendingPathComponent:@"Legend-memory-card.mcr"];BOOL ok=card.size()==131072&&[[NSData dataWithBytes:card.data() length:card.size()]writeToFile:path options:NSDataWritingAtomic error:nil];dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;if(!ok){[self alert:@"Không xuất được thẻ" text:@"Không đọc được thẻ nhớ."];return;}UIDocumentPickerViewController* picker=[[UIDocumentPickerViewController alloc]initForExportingURLs:@[[NSURL fileURLWithPath:path]] asCopy:YES];picker.delegate=self;self->_pickMode=3;[self presentViewController:picker animated:YES completion:nil];});});}
 - (void)tick:(CADisplayLink*)link {

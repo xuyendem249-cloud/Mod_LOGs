@@ -1,4 +1,5 @@
 #include "PlayerCore.hpp"
+extern "C" bool legend_replace_memory_card(const uint8_t* bytes,size_t size);
 #include "CompatibilityTables.hpp"
 #include <cstdarg>
 #include <cstdio>
@@ -61,6 +62,12 @@ std::vector<uint8_t> PlayerCore::saveState(){if(!loaded)return {};size_t n=retro
 bool PlayerCore::loadState(const std::vector<uint8_t>& v){if(!loaded||v.empty()||v.size()>64*1024*1024)return false;input.clear();audio.clear();return retro_unserialize(v.data(),v.size());}
 std::vector<uint8_t> PlayerCore::memoryCard(){if(!loaded)return {};auto* p=static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM));size_t n=retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);if(!p||n!=131072)return {};return {p,p+n};}
 bool PlayerCore::setMemoryCard(const std::vector<uint8_t>& v){if(!loaded||v.size()!=131072||retro_get_memory_size(RETRO_MEMORY_SAVE_RAM)!=v.size())return false;void* p=retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);if(!p)return false;memcpy(p,v.data(),v.size());return true;}
+bool PlayerCore::replaceMemoryCard(const uint8_t* bytes,size_t size){
+ if(!loaded||!legend_replace_memory_card(bytes,size))return false;
+ input.clear();
+ audio.clear();
+ return true;
+}
 std::vector<uint8_t> PlayerCore::ramSnapshot(){if(!loaded)return {};auto* p=static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM));size_t n=retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM);if(!p||n!=0x200000)return {};return {p,p+n};}
 void PlayerCore::reset(){if(loaded){input.clear();audio.clear();retro_reset();}}
 std::string PlayerCore::coreVersion()const{retro_system_info info{};retro_get_system_info(&info);return std::string(info.library_name?info.library_name:"")+":"+(info.library_version?info.library_version:"");}

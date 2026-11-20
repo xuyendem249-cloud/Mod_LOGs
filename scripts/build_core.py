@@ -22,7 +22,7 @@ def build(sdk):
  # Standard static archive; final app links libretro symbols directly, no dlopen.
  run(['xcrun','--sdk',sdk,'libtool','-static','-o',combined,*archives])
  machine=capture(['xcrun','lipo','-archs',combined]);assert machine=='arm64',machine
- symbols=capture(['xcrun','nm','-gU',combined]);required=['retro_init','retro_deinit','retro_run','retro_load_game','retro_get_system_info','retro_set_environment','retro_set_video_refresh','retro_set_input_state','retro_serialize','retro_unserialize','retro_get_memory_data']
+ symbols=capture(['xcrun','nm','-gU',combined]);required=['retro_init','retro_deinit','retro_run','retro_load_game','retro_get_system_info','retro_set_environment','retro_set_video_refresh','retro_set_input_state','retro_serialize','retro_unserialize','retro_get_memory_data','legend_replace_memory_card']
  for symbol in required:
   if '_'+symbol not in symbols:raise RuntimeError('Missing libretro export: '+symbol)
  report=dict(sdk=sdk,architecture=machine,minimum_os=minimum,core_commit=json.loads((ROOT/'sources.lock.json').read_text())['commit'],library=str(combined.relative_to(ROOT)),sha256=hashlib.sha256(combined.read_bytes()).hexdigest(),jit_sources_compiled=False,required_symbols_verified=True,installable_app=False,game_or_bios_tested=False)

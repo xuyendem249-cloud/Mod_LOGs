@@ -7,6 +7,19 @@ UIColor* LGGold(){return [UIColor colorWithRed:.96 green:.78 blue:.36 alpha:1];}
 UIColor* LGInk(){return [UIColor colorWithRed:.045 green:.025 blue:.095 alpha:1];}
 NSString* LGText(const std::string& text){return [[NSString alloc]initWithBytes:text.data() length:text.size() encoding:NSUTF8StringEncoding]?:@"";}
 NSString* LGOrder(const std::vector<int>& slots){NSMutableArray* a=[NSMutableArray array];for(int slot:slots)[a addObject:[NSString stringWithFormat:@"%d",slot+1]];return [a componentsJoinedByString:@" + "];}
+static CGFloat LGLayoutIngredients(NSArray<UIImageView*>* views,CGFloat width,CGFloat y){
+ NSUInteger count=0;
+ for(UIImageView* view in views)if(view.image)++count;
+ if(!count)return y;
+ const CGFloat size=MAX(1,MIN(86,(width-16)/count-6));
+ const CGFloat total=count*(size+6)-6;
+ NSUInteger column=0;
+ for(UIImageView* view in views){
+  view.hidden=view.image==nil;
+  if(!view.hidden)view.frame=CGRectMake((width-total)/2+column++*(size+6),y,size,size*96/102);
+ }
+ return y+size*96/102+10;
+}
 UIImage* LGPixels(const std::vector<uint32_t>& pixels,int width,int height){
  if(pixels.size()!=size_t(width*height))return nil;NSData* bytes=[NSData dataWithBytes:pixels.data() length:pixels.size()*4];CGDataProviderRef provider=CGDataProviderCreateWithCFData((__bridge CFDataRef)bytes);CGColorSpaceRef space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
  CGImageRef image=CGImageCreate(width,height,8,32,width*4,space,kCGImageAlphaFirst|kCGBitmapByteOrder32Little,provider,NULL,NO,kCGRenderingIntentDefault);UIImage* result=image?[UIImage imageWithCGImage:image]:nil;if(image)CGImageRelease(image);CGColorSpaceRelease(space);CGDataProviderRelease(provider);return result;
@@ -43,26 +56,37 @@ NSAttributedString* LGDescription(GameData& data,int card){
 @implementation LGDetail{UIScrollView* _scroll;UILabel* _text;UIImageView* _artView;UIButton* _close;NSMutableArray<UIImageView*>* _ingredientViews;}
 - (void)viewDidLoad{[super viewDidLoad];self.view.backgroundColor=LGInk();_close=[UIButton buttonWithType:UIButtonTypeSystem];[_close setTitle:@"Đóng hình ảnh" forState:0];[_close setTitleColor:LGGold() forState:0];[_close addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_close];_scroll=[[UIScrollView alloc]init];[self.view addSubview:_scroll];_artView=[[UIImageView alloc]initWithImage:self.art];_artView.contentMode=UIViewContentModeScaleAspectFit;_artView.layer.magnificationFilter=kCAFilterNearest;[_scroll addSubview:_artView];_text=[[UILabel alloc]init];_text.numberOfLines=0;_text.attributedText=self.content;[_scroll addSubview:_text];_ingredientViews=[NSMutableArray array];for(UIImage* image in self.ingredients){UIImageView* v=[[UIImageView alloc]initWithImage:image];v.contentMode=UIViewContentModeScaleAspectFit;[_ingredientViews addObject:v];[_scroll addSubview:v];}}
 - (void)close{[self dismissViewControllerAnimated:YES completion:nil];}
-- (void)viewDidLayoutSubviews{[super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);_close.frame=CGRectMake(a.origin.x,a.origin.y,a.size.width,42);_scroll.frame=CGRectMake(a.origin.x,a.origin.y+44,a.size.width,MAX(0,a.size.height-44));CGFloat w=_scroll.bounds.size.width,s=MIN(240,w-32);_artView.frame=CGRectMake((w-s)/2,8,s,s*96/102);CGFloat y=CGRectGetMaxY(_artView.frame)+12;for(NSUInteger i=0;i<_ingredientViews.count;i++)_ingredientViews[i].frame=CGRectMake(w/2-90+i*96,y,84,80);if(_ingredientViews.count)y+=90;CGSize size=[_text sizeThatFits:CGSizeMake(w-32,CGFLOAT_MAX)];_text.frame=CGRectMake(16,y,w-32,size.height);_scroll.contentSize=CGSizeMake(w,y+size.height+24);}
+- (void)viewDidLayoutSubviews{[super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);_close.frame=CGRectMake(a.origin.x,a.origin.y,a.size.width,42);_scroll.frame=CGRectMake(a.origin.x,a.origin.y+44,a.size.width,MAX(0,a.size.height-44));CGFloat w=_scroll.bounds.size.width,s=MIN(240,w-32);_artView.frame=CGRectMake((w-s)/2,8,s,s*96/102);CGFloat y=LGLayoutIngredients(_ingredientViews,w,CGRectGetMaxY(_artView.frame)+12);CGSize size=[_text sizeThatFits:CGSizeMake(w-32,CGFLOAT_MAX)];_text.frame=CGRectMake(16,y,w-32,size.height);_scroll.contentSize=CGSizeMake(w,y+size.height+24);}
 - (BOOL)prefersStatusBarHidden{return YES;}
 @end
 
 @implementation LGVipController{
  std::shared_ptr<GameData> _data;std::shared_ptr<Bytes> _ram;DuelView _duel;dispatch_queue_t _queue;
  UIButton* _close;UIButton* _npcButton;UIImageView* _npcPhoto;UISegmentedControl* _tabs;UISearchBar* _search;UISwitch* _follow;UISwitch* _dealt;UILabel* _followLabel;UILabel* _dealtLabel;UILabel* _status;
+ UISegmentedControl* _recipeType;UIButton* _terrainButton;NSInteger _terrain;
  UITableView* _table;UIScrollView* _detail;UILabel* _description;UIImageView* _art;NSArray<UIImageView*>* _materials;
  NSMutableArray<NSDictionary*>* _rows;NSDictionary* _selection;NSInteger _npc,_revision;BOOL _wide,_actual;CGFloat _keyboard;
 }
-- (instancetype)initWithData:(std::shared_ptr<GameData>)data queue:(dispatch_queue_t)queue ram:(std::shared_ptr<Bytes>)ram{if((self=[super init])){_data=std::move(data);_queue=queue;_ram=std::move(ram);if(_ram)_duel=FusionAdvisor::inspect(*_ram);_npc=_duel.npc>=1&&_duel.npc<=40?_duel.npc:1;self.modalPresentationStyle=UIModalPresentationFullScreen;}return self;}
+- (instancetype)initWithData:(std::shared_ptr<GameData>)data queue:(dispatch_queue_t)queue ram:(std::shared_ptr<Bytes>)ram{if((self=[super init])){_data=std::move(data);_queue=queue;_ram=std::move(ram);if(_ram)_duel=FusionAdvisor::inspect(*_ram,_data->cards());_npc=_duel.npc>=1&&_duel.npc<=40?_duel.npc:1;self.modalPresentationStyle=UIModalPresentationFullScreen;}return self;}
 - (UILabel*)label:(NSString*)s{UILabel* l=[[UILabel alloc]init];l.text=s;l.textColor=LGGold();l.font=[UIFont systemFontOfSize:12];[self.view addSubview:l];return l;}
 - (void)viewDidLoad{
  [super viewDidLoad];self.view.backgroundColor=LGInk();_rows=[NSMutableArray array];_close=[UIButton buttonWithType:UIButtonTypeSystem];[_close setTitle:@"VIP · Deck & Drop                         Đóng" forState:0];[_close setTitleColor:LGGold() forState:0];[_close addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_close];
  _npcPhoto=[[UIImageView alloc]init];_npcPhoto.contentMode=UIViewContentModeScaleAspectFit;[self.view addSubview:_npcPhoto];_npcButton=[UIButton buttonWithType:UIButtonTypeSystem];[_npcButton setTitleColor:UIColor.whiteColor forState:0];[_npcButton addTarget:self action:@selector(chooseNPC) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_npcButton];
- _tabs=[[UISegmentedControl alloc]initWithItems:@[@"Deck",@"S/A POW",@"BCD POW",@"S/A TECH",@"Fusion"]];_tabs.selectedSegmentIndex=0;_tabs.selectedSegmentTintColor=LGGold();[_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName:UIColor.whiteColor,NSFontAttributeName:[UIFont systemFontOfSize:10]} forState:0];[_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName:LGInk()} forState:UIControlStateSelected];[_tabs addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];[self.view addSubview:_tabs];
+ _tabs=[[UISegmentedControl alloc]initWithItems:@[@"Deck",@"S/A POW",@"BCD POW",@"S/A TECH",@"Công thức"]];_tabs.selectedSegmentIndex=0;_tabs.selectedSegmentTintColor=LGGold();[_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName:UIColor.whiteColor,NSFontAttributeName:[UIFont systemFontOfSize:10]} forState:0];[_tabs setTitleTextAttributes:@{NSForegroundColorAttributeName:LGInk()} forState:UIControlStateSelected];[_tabs addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];[self.view addSubview:_tabs];
+ _recipeType=[[UISegmentedControl alloc]initWithItems:@[@"Fusion",@"Equip",@"Ritual"]];
+ _recipeType.selectedSegmentIndex=0;
+ [_recipeType addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];
+ [self.view addSubview:_recipeType];
+ _terrain=-1;
+ _terrainButton=[UIButton buttonWithType:UIButtonTypeSystem];
+ [_terrainButton addTarget:self action:@selector(chooseTerrain) forControlEvents:UIControlEventTouchUpInside];
+ [_terrainButton setTitleColor:LGGold() forState:UIControlStateNormal];
+ _terrainButton.titleLabel.font=[UIFont systemFontOfSize:12];
+ [self.view addSubview:_terrainButton];
  _search=[[UISearchBar alloc]init];_search.placeholder=@"ID / tên bài / nguyên liệu Fusion";_search.delegate=self;_search.searchBarStyle=UISearchBarStyleMinimal;_search.searchTextField.textColor=UIColor.whiteColor;[self.view addSubview:_search];
  _followLabel=[self label:@"Theo NPC"];_dealtLabel=[self label:@"40 lá đã chia"];_follow=[[UISwitch alloc]init];_follow.on=YES;[_follow addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];[self.view addSubview:_follow];_dealt=[[UISwitch alloc]init];[_dealt addTarget:self action:@selector(refresh) forControlEvents:UIControlEventValueChanged];[self.view addSubview:_dealt];_status=[self label:@""];
  _table=[[UITableView alloc]initWithFrame:CGRectZero style:UITableViewStylePlain];_table.backgroundColor=LGInk();_table.dataSource=self;_table.delegate=self;_table.rowHeight=96;_table.keyboardDismissMode=UIScrollViewKeyboardDismissModeOnDrag;[self.view addSubview:_table];
- _detail=[[UIScrollView alloc]init];_detail.backgroundColor=[UIColor colorWithRed:.12 green:.075 blue:.2 alpha:1];[self.view addSubview:_detail];_art=[[UIImageView alloc]init];_art.contentMode=UIViewContentModeScaleAspectFit;_art.layer.magnificationFilter=kCAFilterNearest;[_detail addSubview:_art];_description=[[UILabel alloc]init];_description.numberOfLines=0;[_detail addSubview:_description];UIImageView* one=[[UIImageView alloc]init];UIImageView* two=[[UIImageView alloc]init];_materials=@[one,two];for(UIImageView* v in _materials){v.contentMode=UIViewContentModeScaleAspectFit;[_detail addSubview:v];}
+ _detail=[[UIScrollView alloc]init];_detail.backgroundColor=[UIColor colorWithRed:.12 green:.075 blue:.2 alpha:1];[self.view addSubview:_detail];_art=[[UIImageView alloc]init];_art.contentMode=UIViewContentModeScaleAspectFit;_art.layer.magnificationFilter=kCAFilterNearest;[_detail addSubview:_art];_description=[[UILabel alloc]init];_description.numberOfLines=0;[_detail addSubview:_description];NSMutableArray* views=[NSMutableArray array];for(int i=0;i<4;++i){UIImageView* v=[[UIImageView alloc]init];v.contentMode=UIViewContentModeScaleAspectFit;[_detail addSubview:v];[views addObject:v];}_materials=views;
  [[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(keyboard:) name:UIKeyboardWillChangeFrameNotification object:nil];[self refresh];
 }
 - (void)dealloc{[[NSNotificationCenter defaultCenter]removeObserver:self];}
@@ -75,36 +99,98 @@ NSAttributedString* LGDescription(GameData& data,int card){
  [a addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleCancel handler:nil]];a.popoverPresentationController.sourceView=_npcButton;a.popoverPresentationController.sourceRect=_npcButton.bounds;[self presentViewController:a animated:YES completion:nil];
 }
 - (BOOL)matches:(NSString*)q card:(int)card{return q.length==0||[q isEqualToString:[NSString stringWithFormat:@"%d",card]]||[LGText(_data->names[card]) rangeOfString:q options:NSCaseInsensitiveSearch|NSDiacriticInsensitiveSearch].location!=NSNotFound;}
+- (NSString*)terrainTitle:(NSInteger)terrain{
+ if(terrain==-2)return @"Tất cả sân";
+ if(terrain==-1)return @"Sân hiện tại";
+ return [NSString stringWithFormat:@"Sân %ld",(long)terrain];
+}
+- (void)chooseTerrain{
+ UIAlertController* sheet=[UIAlertController alertControllerWithTitle:@"Địa hình" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+ for(NSInteger i=-2;i<=6;++i){
+  [sheet addAction:[UIAlertAction actionWithTitle:[self terrainTitle:i] style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){self->_terrain=i;[self refresh];}]];
+ }
+ [sheet addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleCancel handler:nil]];
+ sheet.popoverPresentationController.sourceView=_terrainButton;
+ sheet.popoverPresentationController.sourceRect=_terrainButton.bounds;
+ [self presentViewController:sheet animated:YES completion:nil];
+}
+- (void)appendRecipes:(NSMutableArray*)found query:(NSString*)query kind:(NSInteger)kind terrain:(NSInteger)terrain{
+ // The key holds result/target and up to four ingredient IDs with zero padding.
+ std::map<std::array<int,5>,unsigned> rows;
+ const int first=terrain==-2?0:int(terrain),last=terrain==-2?6:int(terrain);
+ for(int t=first;t<=last;++t){
+  const unsigned bit=1u<<t;
+  if(kind==0){
+   for(const auto& [pair,result]:_data->fusions(t))rows[{result,pair/1024,pair%1024,0,0}]|=bit;
+  }else if(kind==1){
+   for(const auto& [equip,targets]:_data->equips(t))
+    for(int target:targets)rows[{target,equip,0,0,0}]|=bit;
+  }else{
+   for(const Ritual& row:_data->rituals(t))rows[{row[4],row[0],row[1],row[2],row[3]}]|=bit;
+  }
+ }
+ for(const auto& [cards,mask]:rows){
+  BOOL matches=NO;
+  for(int id:cards)if(id && [self matches:query card:id]){matches=YES;break;}
+  if(!matches)continue;
+  NSMutableArray* ingredients=[NSMutableArray array];
+  NSMutableArray* terrainNumbers=[NSMutableArray array];
+  for(size_t i=1;i<cards.size() && cards[i];++i)[ingredients addObject:@(cards[i])];
+  for(int t=0;t<=6;++t)if(mask&(1u<<t))[terrainNumbers addObject:[NSString stringWithFormat:@"%d",t]];
+  NSString* suffix=[NSString stringWithFormat:@"Sân %@",[terrainNumbers componentsJoinedByString:@", "]];
+  if(kind==1)suffix=[suffix stringByAppendingString:@" · Mức tăng tùy lá và trạng thái trận"];
+  [found addObject:@{@"id":@(cards[0]),@"ingredients":ingredients,@"recipeDetail":suffix}];
+ }
+}
 - (void)searchBar:(UISearchBar*)bar textDidChange:(NSString*)text{[self refresh];}
 - (void)searchBarSearchButtonClicked:(UISearchBar*)bar{[bar resignFirstResponder];[self refresh];}
 - (void)refresh{
  if(_follow.on&&_duel.npc>=1&&_duel.npc<=40)_npc=_duel.npc;int physical=_npc==40?0:int(_npc),mode=int(_tabs.selectedSegmentIndex);NSInteger revision=++_revision;
  [_npcButton setTitle:[NSString stringWithFormat:@"[%02ld] %@ ▾",(long)_npc,LGText(_data->npcNames[physical])] forState:0];_npcPhoto.image=LGPixels(_data->npcPhoto(physical),48,48);_dealt.hidden=_dealtLabel.hidden=mode!=0;
+ _follow.hidden=_followLabel.hidden=mode==4;
+ _recipeType.hidden=_terrainButton.hidden=mode!=4;
+ [_terrainButton setTitle:[self terrainTitle:_terrain] forState:UIControlStateNormal];
+ [self.view setNeedsLayout];
+ const NSInteger kind=_recipeType.selectedSegmentIndex;
+ const NSInteger terrain=_terrain==-1?std::clamp(_duel.terrain,0,6):_terrain;
  NSString* q=[_search.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];BOOL actual=_dealt.on&&mode==0&&_ram&&_duel.duel&&_duel.npc==_npc;_status.text=@"Đang đọc…";
  dispatch_async(_queue,^{NSMutableArray* found=[NSMutableArray array];NSString* problem=nil;try{
-  if(mode==4){int terrain=self->_duel.duel?std::clamp(self->_duel.terrain,0,6):0;for(const auto& entry:self->_data->fusions(terrain)){int a=entry.first/1024,b=entry.first%1024,r=entry.second;if([self matches:q card:a]||[self matches:q card:b]||[self matches:q card:r])[found addObject:@{@"id":@(r),@"a":@(a),@"b":@(b),@"weight":@0}];}}
-  else{std::array<int,722> weights=self->_data->pools[physical][mode];if(actual){weights.fill(0);for(int i=0;i<40;i++){int id=u16(*self->_ram,0x1a7e20+(40+i)*6);if(id>=1&&id<=722)weights[id-1]++;}}for(int id=1;id<=722;id++)if(weights[id-1]&&[self matches:q card:id])[found addObject:@{@"id":@(id),@"weight":@(weights[id-1])}];[found sortUsingComparator:^NSComparisonResult(NSDictionary* a,NSDictionary* b){int x=[a[@"weight"]intValue],y=[b[@"weight"]intValue];if(x!=y)return x>y?NSOrderedAscending:NSOrderedDescending;return [a[@"id"]compare:b[@"id"]];}];}
+  if(mode==4){[self appendRecipes:found query:q kind:kind terrain:terrain];}
+  else{const auto& pool=self->_data->pools[physical][mode];std::vector<int> weights(pool.begin(),pool.end());if(actual){weights.assign(self->_data->cards(),0);for(int i=0;i<40;i++){int id=u16(*self->_ram,0x1a7e20+(40+i)*6);if(id>=1&&id<=self->_data->cards())weights[id-1]++;}}for(size_t i=0;i<weights.size();i++){int id=int(i)+1;if(weights[i]&&[self matches:q card:id])[found addObject:@{@"id":@(id),@"weight":@(weights[i])}];}[found sortUsingComparator:^NSComparisonResult(NSDictionary* a,NSDictionary* b){int x=[a[@"weight"]intValue],y=[b[@"weight"]intValue];if(x!=y)return x>y?NSOrderedAscending:NSOrderedDescending;return [a[@"id"]compare:b[@"id"]];}];}
  }catch(const std::exception& e){problem=LGText(e.what());}
- dispatch_async(dispatch_get_main_queue(),^{if(revision!=self->_revision)return;self->_actual=actual;self->_rows=found;self->_status.text=problem?:[NSString stringWithFormat:@"%lu dòng%@",(unsigned long)found.count,actual?@" · 40 lá thực tế":@" · trọng số / 2048"];[self->_table reloadData];self->_selection=found.firstObject;if(self->_selection)[self detail:self->_selection modal:NO];else{self->_art.image=nil;self->_description.text=@"Không tìm thấy bài";}});
+ dispatch_async(dispatch_get_main_queue(),^{if(revision!=self->_revision)return;self->_actual=actual;self->_rows=found;self->_status.text=problem?:[NSString stringWithFormat:@"%lu dòng%@",(unsigned long)found.count,mode==4?@"":actual?@" · 40 lá thực tế":@" · trọng số / 2048"];[self->_table reloadData];self->_selection=found.firstObject;if(self->_selection)[self detail:self->_selection modal:NO];else{self->_art.image=nil;for(UIImageView* view in self->_materials)view.image=nil;self->_description.text=@"Không tìm thấy bài";[self.view setNeedsLayout];}});
  });
 }
 - (NSInteger)tableView:(UITableView*)table numberOfRowsInSection:(NSInteger)section{return _rows.count;}
 - (UITableViewCell*)tableView:(UITableView*)table cellForRowAtIndexPath:(NSIndexPath*)path{
- UITableViewCell* cell=[table dequeueReusableCellWithIdentifier:@"card"];if(!cell)cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"card"];NSDictionary* row=_rows[path.row];int id=[row[@"id"]intValue];cell.textLabel.text=[NSString stringWithFormat:@"[%03d] %@",id,LGText(_data->names[id])];cell.textLabel.textColor=LGGold();cell.textLabel.font=[UIFont boldSystemFontOfSize:13];cell.textLabel.numberOfLines=2;auto s=_data->stats(id);NSString* extra=row[@"a"]?[NSString stringWithFormat:@"[%@] %@ + [%@] %@",row[@"a"],LGText(_data->names[[row[@"a"]intValue]]),row[@"b"],LGText(_data->names[[row[@"b"]intValue]])]:_actual?[NSString stringWithFormat:@"Số lượng: %@",row[@"weight"]]:[NSString stringWithFormat:@"Trọng số: %@ · %.4f%%",row[@"weight"],[row[@"weight"]doubleValue]*100/2048];cell.detailTextLabel.text=[NSString stringWithFormat:@"ATK %d / DEF %d\n%@",s[0],s[1],extra];cell.detailTextLabel.textColor=UIColor.whiteColor;cell.detailTextLabel.font=[UIFont systemFontOfSize:11];cell.detailTextLabel.numberOfLines=3;cell.backgroundColor=path.row%2?[UIColor colorWithRed:.09 green:.06 blue:.15 alpha:1]:[UIColor colorWithRed:.14 green:.10 blue:.22 alpha:1];cell.imageView.image=nil;cell.tag=id;
- if(!row[@"a"]){dispatch_async(_queue,^{UIImage* art=nil;try{art=LGPixels(self->_data->art(id),102,96);}catch(...){}dispatch_async(dispatch_get_main_queue(),^{if(cell.tag==id){cell.imageView.image=art;[cell setNeedsLayout];}});});}return cell;
+ UITableViewCell* cell=[table dequeueReusableCellWithIdentifier:@"card"];if(!cell)cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"card"];NSDictionary* row=_rows[path.row];int id=[row[@"id"]intValue];cell.textLabel.text=[NSString stringWithFormat:@"[%03d] %@",id,LGText(_data->names[id])];cell.textLabel.textColor=LGGold();cell.textLabel.font=[UIFont boldSystemFontOfSize:13];cell.textLabel.numberOfLines=2;
+ const auto stats=_data->stats(id);
+ NSString* extra;
+ NSArray<NSNumber*>* ingredients=row[@"ingredients"];
+ if(ingredients){
+  NSMutableArray<NSString*>* labels=[NSMutableArray array];
+  for(NSNumber* ingredient in ingredients){int card=ingredient.intValue;[labels addObject:[NSString stringWithFormat:@"[%03d] %@",card,LGText(_data->names[card])]];}
+  extra=[NSString stringWithFormat:@"%@\n%@",[labels componentsJoinedByString:@" + "],row[@"recipeDetail"]];
+ }else{
+  extra=_actual?[NSString stringWithFormat:@"Số lượng: %@",row[@"weight"]]:[NSString stringWithFormat:@"Trọng số: %@ · %.4f%%",row[@"weight"],[row[@"weight"]doubleValue]*100/2048];
+ }
+ cell.detailTextLabel.text=[NSString stringWithFormat:@"ATK %d / DEF %d\n%@",stats[0],stats[1],extra];cell.detailTextLabel.textColor=UIColor.whiteColor;cell.detailTextLabel.font=[UIFont systemFontOfSize:11];cell.detailTextLabel.numberOfLines=4;cell.backgroundColor=path.row%2?[UIColor colorWithRed:.09 green:.06 blue:.15 alpha:1]:[UIColor colorWithRed:.14 green:.10 blue:.22 alpha:1];cell.imageView.image=nil;cell.tag=ingredients?0:id;
+ if(!ingredients){dispatch_async(_queue,^{UIImage* art=nil;try{art=LGPixels(self->_data->art(id),102,96);}catch(...){}dispatch_async(dispatch_get_main_queue(),^{if(cell.tag==id){cell.imageView.image=art;[cell setNeedsLayout];}});});}return cell;
 }
 - (void)tableView:(UITableView*)table didSelectRowAtIndexPath:(NSIndexPath*)path{_selection=_rows[path.row];[self detail:_selection modal:!_wide];}
 - (void)detail:(NSDictionary*)row modal:(BOOL)modal{
- int id=[row[@"id"]intValue];NSInteger revision=_revision;dispatch_async(_queue,^{UIImage* art=nil;NSMutableArray* materials=[NSMutableArray array];try{art=LGPixels(self->_data->art(id),102,96);if(row[@"a"])for(NSString* k in @[@"a",@"b"]){UIImage* image=LGPixels(self->_data->art([row[k]intValue]),102,96);if(image)[materials addObject:image];}}catch(...){}
+ int id=[row[@"id"]intValue];NSInteger revision=_revision;dispatch_async(_queue,^{UIImage* art=nil;NSMutableArray* materials=[NSMutableArray array];try{art=LGPixels(self->_data->art(id),102,96);for(NSNumber* ingredient in row[@"ingredients"]){UIImage* image=LGPixels(self->_data->art(ingredient.intValue),102,96);if(image)[materials addObject:image];}}catch(...){}
  auto stats=self->_data->stats(id);NSString* head=[NSString stringWithFormat:@"[%03d] %@\nATK %d / DEF %d\n\n",id,LGText(self->_data->names[id]),stats[0],stats[1]];NSMutableAttributedString* content=[[NSMutableAttributedString alloc]initWithString:head attributes:@{NSFontAttributeName:[UIFont boldSystemFontOfSize:14],NSForegroundColorAttributeName:LGGold()}];[content appendAttributedString:LGDescription(*self->_data,id)];
- dispatch_async(dispatch_get_main_queue(),^{if(revision!=self->_revision||self->_selection!=row)return;if(modal&&!self->_wide){LGDetail* d=[[LGDetail alloc]init];d.content=content;d.art=art;d.ingredients=materials;d.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:d animated:YES completion:nil];}else{self->_art.image=art;self->_description.attributedText=content;for(NSUInteger i=0;i<2;i++)self->_materials[i].image=i<materials.count?materials[i]:nil;self->_detail.contentOffset=CGPointZero;[self.view setNeedsLayout];}});
+ dispatch_async(dispatch_get_main_queue(),^{if(revision!=self->_revision||self->_selection!=row)return;if(modal&&!self->_wide){LGDetail* d=[[LGDetail alloc]init];d.content=content;d.art=art;d.ingredients=materials;d.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:d animated:YES completion:nil];}else{self->_art.image=art;self->_description.attributedText=content;for(NSUInteger i=0;i<self->_materials.count;i++)self->_materials[i].image=i<materials.count?materials[i]:nil;self->_detail.contentOffset=CGPointZero;[self.view setNeedsLayout];}});
  });
 }
 - (void)viewDidLayoutSubviews{
  [super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);CGFloat x=a.origin.x+8,y=a.origin.y,w=a.size.width-16,h=a.size.height;BOOL wasWide=_wide;_wide=a.size.width>a.size.height&&w>=600;if(!wasWide&&_wide&&[self.presentedViewController isKindOfClass:LGDetail.class])[self dismissViewControllerAnimated:NO completion:nil];CGFloat left=_wide?w*.55:w;
  _close.frame=CGRectMake(x,y,w,36);y+=38;CGFloat contentY=y;_npcPhoto.frame=CGRectMake(x,y,40,40);_npcButton.frame=CGRectMake(x+44,y,left-44,40);y+=42;_tabs.frame=CGRectMake(x,y,left,32);y+=34;_search.frame=CGRectMake(x-6,y,left+12,44);y+=44;
- _followLabel.frame=CGRectMake(x,y,left*.5-50,32);_follow.frame=CGRectMake(x+left*.5-53,y,51,31);_dealtLabel.frame=CGRectMake(x+left*.5+4,y,left*.5-59,32);_dealt.frame=CGRectMake(x+left-51,y,51,31);y+=32;_status.frame=CGRectMake(x,y,left,24);y+=24;
- CGFloat bottom=MIN(CGRectGetMaxY(a),self.view.bounds.size.height-_keyboard);_table.frame=CGRectMake(x,y,left,MAX(0,bottom-y));_detail.hidden=!_wide;_detail.frame=CGRectMake(x+left+8,contentY,MAX(0,w-left-8),MAX(0,h-38));CGFloat dw=_detail.bounds.size.width,s=MIN(150,MAX(1,dw-24));_art.frame=CGRectMake((dw-s)/2,6,s,s*96/102);CGFloat dy=CGRectGetMaxY(_art.frame)+8;BOOL mat=_materials.firstObject.image!=nil;for(NSUInteger i=0;i<2;i++){_materials[i].hidden=!mat;_materials[i].frame=CGRectMake(dw/2-76+i*80,dy,72,68);}if(mat)dy+=76;CGSize size=[_description sizeThatFits:CGSizeMake(MAX(1,dw-20),CGFLOAT_MAX)];_description.frame=CGRectMake(10,dy,MAX(1,dw-20),size.height);_detail.contentSize=CGSizeMake(dw,dy+size.height+20);
+ _followLabel.frame=CGRectMake(x,y,left*.5-50,32);_follow.frame=CGRectMake(x+left*.5-53,y,51,31);_dealtLabel.frame=CGRectMake(x+left*.5+4,y,left*.5-59,32);_dealt.frame=CGRectMake(x+left-51,y,51,31);
+ _recipeType.frame=CGRectMake(x,y,MAX(0,left-100),32);_terrainButton.frame=CGRectMake(x+left-96,y,96,32);
+ y+=32;_status.frame=CGRectMake(x,y,left,24);y+=24;
+ CGFloat bottom=MIN(CGRectGetMaxY(a),self.view.bounds.size.height-_keyboard);_table.frame=CGRectMake(x,y,left,MAX(0,bottom-y));_detail.hidden=!_wide;_detail.frame=CGRectMake(x+left+8,contentY,MAX(0,w-left-8),MAX(0,h-38));CGFloat dw=_detail.bounds.size.width,s=MIN(150,MAX(1,dw-24));_art.frame=CGRectMake((dw-s)/2,6,s,s*96/102);CGFloat dy=LGLayoutIngredients(_materials,dw,CGRectGetMaxY(_art.frame)+8);CGSize size=[_description sizeThatFits:CGSizeMake(MAX(1,dw-20),CGFLOAT_MAX)];_description.frame=CGRectMake(10,dy,MAX(1,dw-20),size.height);_detail.contentSize=CGSizeMake(dw,dy+size.height+20);
 }
 @end
 

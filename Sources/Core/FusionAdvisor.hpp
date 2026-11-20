@@ -13,7 +13,7 @@ class FusionAdvisor{
  Routes routes(const DuelView&,const FusionMap&,const Bytes*,const Rules&,const std::vector<int>&);
 public:
  FusionAdvisor(GameData& d,std::vector<RamCode> s):data(d),signatures(std::move(s)){}
- static DuelView inspect(const Bytes&);
+ static DuelView inspect(const Bytes&,int cardCount);
  bool recognized(const Bytes*)const;
  Rules rules(const Bytes*)const;
  FusionRow score(int,const std::vector<int>&,const DuelView&,const Bytes*,const Rules&)const;

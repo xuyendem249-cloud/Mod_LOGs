@@ -39,6 +39,16 @@ void authenticate(const uint8_t* key,NSData* purpose,const void* encoded,size_t 
  NSData* _keys;
 }
 
+#if TARGET_OS_SIMULATOR
+- (instancetype)initForSimulatorSmoke{
+ if(!(self=[super init]))return nil;
+ NSMutableData* keys=[NSMutableData dataWithLength:keySize*2];
+ if(SecRandomCopyBytes(kSecRandomDefault,keys.length,static_cast<uint8_t*>(keys.mutableBytes))!=errSecSuccess)return nil;
+ _keys=[keys copy];
+ return self;
+}
+#endif
+
 - (NSData*)keys:(NSError**)error {
  @synchronized(self){
   if(_keys)return _keys;

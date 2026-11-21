@@ -1,7 +1,7 @@
 {
   "name": "Yu-Gi-Oh! FM: Legend",
   "version": "0.4.0",
-  "build": 7,
+  "build": 8,
   "bundle_id": "vn.anhchugia35.legend",
   "minimum_ios": "17.0",
   "android_reference": {

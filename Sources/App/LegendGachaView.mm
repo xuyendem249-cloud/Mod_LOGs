@@ -1,11 +1,13 @@
 #import "LegendGachaView.hpp"
 #import "LegendViews.hpp"
+#import "LegendConsoleSkin.hpp"
 #import <AVFoundation/AVFoundation.h>
 #import <QuartzCore/QuartzCore.h>
 #include "Gacha.hpp"
 #include <cmath>
 
 namespace {
+using Legend::ConsoleSkin::color;
 UIColor* slate(double r,double g,double b){return [UIColor colorWithRed:r green:g blue:b alpha:1];}
 UIImage* mediaImage(NSURL* folder,NSString* name){
  return [UIImage imageWithContentsOfFile:[folder URLByAppendingPathComponent:name].path];
@@ -34,6 +36,13 @@ UILabel* label(CGFloat size,UIColor* color){
  value.textColor=color;
  value.textAlignment=NSTextAlignmentCenter;
  return value;
+}
+CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,CGFloat radius){
+ CAGradientLayer* layer=[CAGradientLayer layer];
+ layer.colors=@[(__bridge id)color(top).CGColor,(__bridge id)color(bottom).CGColor];
+ layer.cornerRadius=radius;layer.borderWidth=1;layer.borderColor=color(border).CGColor;
+ [view.layer insertSublayer:layer atIndex:0];
+ return layer;
 }
 }
 
@@ -116,12 +125,15 @@ UILabel* label(CGFloat size,UIColor* color){
  CFTimeInterval _started;
  LGGoldPodium* _podium;
  UIImageView* _pack;
+ UIScrollView* _choices;
  UIView* _menu,*_results;
  UILabel* _stars,*_message;
- UIButton* _close,*_again;
+ UIButton* _close,*_again,*_tapPack;
  UIStackView* _boxes,*_giftRow;
  UITextField* _code;
  UIScrollView* _grid;
+ CAGradientLayer* _walletTint,*_closeTint;
+ NSMutableArray<CAGradientLayer*>* _packTints;
  NSMutableArray<UIImageView*>* _rewardImages;
  NSMutableArray<UILabel*>* _rewardLabels;
  BOOL _pending,_revealing;
@@ -138,19 +150,21 @@ UILabel* label(CGFloat size,UIColor* color){
 }
 - (void)viewDidLoad{
  [super viewDidLoad];
- self.view.backgroundColor=slate(.035,.028,.07);
+ self.view.backgroundColor=color(0xff100e20);
  NSURL* background=mediaFile(_media,@"ambient.mp4");
  if(background){
   _ambient=[AVQueuePlayer queuePlayerWithItems:@[]];
   _ambient.muted=YES;
   _ambientLoop=[AVPlayerLooper playerLooperWithPlayer:_ambient templateItem:[AVPlayerItem playerItemWithURL:background]];
   _ambientLayer=[AVPlayerLayer playerLayerWithPlayer:_ambient];
-  _ambientLayer.videoGravity=AVLayerVideoGravityResizeAspectFill;
+  _ambientLayer.videoGravity=AVLayerVideoGravityResize;
   [self.view.layer addSublayer:_ambientLayer];
  }
  NSURL* music=mediaFile(_media,@"bgm.mp3");
- if(music){_music=[[AVAudioPlayer alloc]initWithContentsOfURL:music error:nil];_music.numberOfLoops=-1;}
- _menu=[[UIView alloc]init];[self.view addSubview:_menu];
+ if(music){_music=[[AVAudioPlayer alloc]initWithContentsOfURL:music error:nil];_music.numberOfLoops=-1;_music.volume=.5;}
+ _choices=[[UIScrollView alloc]init];_choices.showsVerticalScrollIndicator=NO;
+ _choices.keyboardDismissMode=UIScrollViewKeyboardDismissModeOnDrag;[self.view addSubview:_choices];
+ _menu=[[UIView alloc]init];[_choices addSubview:_menu];
  _results=[[UIView alloc]init];_results.hidden=YES;[self.view addSubview:_results];
  _podium=[[LGGoldPodium alloc]init];_podium.opaque=NO;_podium.backgroundColor=UIColor.clearColor;
  _podium.art=mediaImage(_media,@"podium.png");[_menu addSubview:_podium];
@@ -158,33 +172,48 @@ UILabel* label(CGFloat size,UIColor* color){
  if(first)_faces=@[first,mediaImage(_media,@"kaiba.png")?:first,mediaImage(_media,@"jonouchi.png")?:first];
  _pack=[[UIImageView alloc]initWithImage:first];_pack.contentMode=UIViewContentModeScaleAspectFit;
  [_menu addSubview:_pack];
- _stars=label(24,LGGold());_stars.textAlignment=NSTextAlignmentLeft;
- _stars.layer.shadowColor=LGGold().CGColor;_stars.layer.shadowOpacity=.65;_stars.layer.shadowRadius=7;
+ _tapPack=[UIButton buttonWithType:UIButtonTypeCustom];_tapPack.tag=1;_tapPack.accessibilityLabel=@"Pack x1";
+ [_tapPack addTarget:self action:@selector(open:) forControlEvents:UIControlEventTouchUpInside];[_menu addSubview:_tapPack];
+ _stars=label(23,color(0xffffd77c));
+ _walletTint=tint(_stars,0xf233261d,0xf215101b,0xffce9a54,12);
  [self.view addSubview:_stars];[self updateStars];
- _close=action(@"×",slate(.62,.10,.15),self,@selector(close));_close.titleLabel.font=[UIFont boldSystemFontOfSize:24];
+ _close=action(@"×",UIColor.clearColor,self,@selector(close));_close.titleLabel.font=[UIFont boldSystemFontOfSize:22];
+ _close.layer.borderWidth=0;
+ _closeTint=tint(_close,0xff922f40,0xff641b2b,0xffce6870,12);
  _close.accessibilityLabel=@"Đóng Gacha";[self.view addSubview:_close];
  _message=label(13,UIColor.whiteColor);_message.numberOfLines=2;[self.view addSubview:_message];
- _boxes=[[UIStackView alloc]init];_boxes.distribution=UIStackViewDistributionFillEqually;_boxes.spacing=8;
- NSArray<UIColor*>* colors=@[slate(.16,.13,.24),slate(.105,.32,.20),slate(.55,.11,.18)];
- size_t index=0;
+ _boxes=[[UIStackView alloc]init];_boxes.distribution=UIStackViewDistributionFillEqually;_boxes.spacing=6;
+ _packTints=[NSMutableArray array];
  for(int quantity:{1,5,10}){
-  UIButton* button=action([NSString stringWithFormat:@"Pack x%d\n★ %d",quantity,Legend::Gacha::price(quantity)],
-   colors[index++],self,@selector(open:));
+  NSString* name=[NSString stringWithFormat:@"Pack x%d\n",quantity];
+  NSString* cost=[NSString stringWithFormat:@"★ %d",Legend::Gacha::price(quantity)];
+  NSMutableAttributedString* display=[[NSMutableAttributedString alloc]initWithString:name attributes:
+   @{NSForegroundColorAttributeName:color(0xfff1eef6),NSFontAttributeName:[UIFont boldSystemFontOfSize:14]}];
+  [display appendAttributedString:[[NSAttributedString alloc]initWithString:cost attributes:
+   @{NSForegroundColorAttributeName:color(0xffffd77c),NSFontAttributeName:[UIFont boldSystemFontOfSize:16.8]}]];
+  UIButton* button=action(name,UIColor.clearColor,self,@selector(open:));
+  [button setAttributedTitle:display forState:UIControlStateNormal];
+  button.layer.borderWidth=0;
+  CAGradientLayer* cap=quantity==5?tint(button,0xff26684c,0xff123b2d,0xff63b987,6):
+   quantity==10?tint(button,0xff93374a,0xff5e1b2c,0xffd0707b,6):tint(button,0xff1b1930,0xff1b1930,0xff78663c,6);
+  [_packTints addObject:cap];
   button.tag=quantity;
   [_boxes addArrangedSubview:button];
  }
  [_menu addSubview:_boxes];
  _giftRow=[[UIStackView alloc]init];
- _giftRow.spacing=12;
- UIImageView* gift=[[UIImageView alloc]initWithImage:[UIImage systemImageNamed:@"gift"]];
- gift.tintColor=LGGold();gift.contentMode=UIViewContentModeCenter;
- [gift.widthAnchor constraintEqualToConstant:28].active=YES;
+ _giftRow.spacing=7;_giftRow.layoutMargins=UIEdgeInsetsMake(0,10,0,6);_giftRow.layoutMarginsRelativeArrangement=YES;
+ _giftRow.backgroundColor=color(0xe61b1930);_giftRow.layer.cornerRadius=6;
+ _giftRow.layer.borderWidth=1;_giftRow.layer.borderColor=color(0xff78663c).CGColor;
+ UILabel* gift=label(19,LGGold());gift.text=@"🎁";gift.accessibilityLabel=@"Mã quà Gacha";
+ [gift.widthAnchor constraintEqualToConstant:32].active=YES;
  [_giftRow addArrangedSubview:gift];
  _code=[[UITextField alloc]init];
- _code.borderStyle=UITextBorderStyleRoundedRect;
- _code.backgroundColor=slate(.15,.12,.22);_code.textColor=UIColor.whiteColor;
+ _code.borderStyle=UITextBorderStyleNone;
+ _code.backgroundColor=UIColor.clearColor;_code.textColor=UIColor.whiteColor;
  _code.autocorrectionType=UITextAutocorrectionTypeNo;_code.autocapitalizationType=UITextAutocapitalizationTypeNone;
  _code.accessibilityLabel=@"Mã quà Gacha";
+ _code.returnKeyType=UIReturnKeyDone;[_code addTarget:self action:@selector(redeem) forControlEvents:UIControlEventEditingDidEndOnExit];
  [_giftRow addArrangedSubview:_code];
  UIButton* redeem=action(@"Đổi mã",slate(.19,.15,.27),self,@selector(redeem));
  [redeem.widthAnchor constraintEqualToConstant:78].active=YES;
@@ -199,12 +228,14 @@ UILabel* label(CGFloat size,UIColor* color){
   }
  }
  _grid=[[UIScrollView alloc]init];[_results addSubview:_grid];
- _again=action(@"Mở tiếp",slate(.19,.15,.27),self,@selector(returnToPacks));[_results addSubview:_again];
+ _again=action(@"Mở tiếp",color(0xff1b1930),self,@selector(returnToPacks));[_grid addSubview:_again];
 }
 - (BOOL)prefersStatusBarHidden{return YES;}
 - (void)viewDidAppear:(BOOL)animated{
  [super viewDidAppear:animated];
  [_ambient play];[_music play];
+ NSURL* entrance=mediaFile(_media,@"enter.wav");
+ if(entrance){_stinger=[[AVAudioPlayer alloc]initWithContentsOfURL:entrance error:nil];[_stinger play];}
  if(!_link){
   _started=CACurrentMediaTime();
   _link=[CADisplayLink displayLinkWithTarget:self selector:@selector(advance:)];
@@ -223,31 +254,43 @@ UILabel* label(CGFloat size,UIColor* color){
  CGRect bounds=self.view.bounds;
  CGRect safe=UIEdgeInsetsInsetRect(bounds,self.view.safeAreaInsets);
  CGFloat w=safe.size.width,h=safe.size.height,x=safe.origin.x,y=safe.origin.y;
- CGFloat center=CGRectGetMidX(safe);
- _ambientLayer.frame=bounds;_openingLayer.frame=bounds;_rewardLayer.frame=bounds;
- _menu.frame=_results.frame=bounds;
- _stars.frame=CGRectMake(x+16,y+5,w-82,44);_close.frame=CGRectMake(CGRectGetMaxX(safe)-58,y+8,44,42);
- CGFloat width=MIN(w-28,540),packHeight=MAX(5,h-174);
- _pack.bounds=CGRectMake(0,0,MIN(w*.55,packHeight*.76),packHeight*.89);
- _pack.center=CGPointMake(center,y+40+packHeight*.44);
- _podium.frame=CGRectMake(center-MIN(w*.68,350)/2,y+packHeight*.68,MIN(w*.68,350),packHeight*.34+28);
- _boxes.frame=CGRectMake(center-width/2,CGRectGetMaxY(safe)-118,width,52);
- CGFloat giftWidth=MIN(width,342);
- _giftRow.frame=CGRectMake(center-giftWidth/2,CGRectGetMaxY(safe)-56,giftWidth,36);
- _message.frame=CGRectMake(x+12,y+48,w-24,38);
- _grid.frame=CGRectMake(x+10,y+84,w-20,MAX(0,h-145));
- _again.frame=CGRectMake(center-70,CGRectGetMaxY(safe)-50,140,40);
+ _ambientLayer.frame=bounds;_rewardLayer.frame=bounds;
+ constexpr CGFloat videoWidth=960,videoHeight=540;
+ CGFloat openingScale=MIN(MAX(bounds.size.width/videoWidth,bounds.size.height/videoHeight),bounds.size.width/(videoWidth*.6));
+ CGSize openingSize=CGSizeMake(videoWidth*openingScale,videoHeight*openingScale);
+ _openingLayer.frame=CGRectMake(CGRectGetMidX(bounds)-openingSize.width/2,CGRectGetMidY(bounds)-openingSize.height/2,openingSize.width,openingSize.height);
+ _results.frame=bounds;
+ CGSize wallet=[_stars sizeThatFits:CGSizeMake(w-90,44)];
+ _stars.frame=CGRectMake(x+16,y+9,MAX(84,ceil(wallet.width)+26),44);
+ _close.frame=CGRectMake(CGRectGetMaxX(safe)-60,y+9,44,44);
+ _walletTint.frame=_stars.bounds;_closeTint.frame=_close.bounds;
+ CGFloat top=y+53,width=MAX(1,w-32);
+ CGFloat bottom=CGRectGetMaxY(safe);
+ if(self.keyboardLayoutGuide.layoutFrame.origin.y>top)bottom=MIN(bottom,self.keyboardLayoutGuide.layoutFrame.origin.y);
+ _choices.frame=CGRectMake(x,top,w,MAX(0,bottom-top));
+ _menu.frame=CGRectMake(0,0,w,379);_choices.contentSize=_menu.frame.size;
+ _pack.bounds=CGRectMake(0,0,144,225);_pack.center=CGPointMake(w/2,112.5);
+ _tapPack.frame=CGRectMake((w-144)/2,0,144,225);
+ _podium.frame=CGRectMake(16,65,width,160);
+ _boxes.frame=CGRectMake(19,225,MAX(1,width-6),64);[_boxes layoutIfNeeded];
+ for(NSUInteger i=0;i<_packTints.count;i++)_packTints[i].frame=_boxes.arrangedSubviews[i].bounds;
+ _giftRow.frame=CGRectMake(16,313,width,54);
+ _message.frame=CGRectMake(x+16,CGRectGetMaxY(safe)-50,width,38);
+ _grid.frame=CGRectMake(x+16,top,width,MAX(0,h-65));
  CGFloat usable=_grid.bounds.size.width;
- NSUInteger columns=MIN(_rewardImages.count,w>h?5:3);
+ NSUInteger columns=MIN(_rewardImages.count,3);
+ if(_rewardImages.count>1)columns=3;
  if(columns){
-  CGFloat cardW=MIN(120,(usable-12*columns)/columns),cardH=cardW*1.32;
-  CGFloat left=(usable-columns*(cardW+12)+12)/2;
+  CGFloat cardW=MAX(1,usable/columns-10),cardH=_rewardImages.count==1?192:110;
   for(NSUInteger i=0;i<_rewardImages.count;i++){
-   CGFloat px=left+(i%columns)*(cardW+12),py=8+(i/columns)*(cardH+44);
+   NSUInteger inRow=MIN(columns,_rewardImages.count-(i/columns)*columns);
+   CGFloat px=(usable-inRow*(cardW+10))/2+5+(i%columns)*(cardW+10),py=5+(i/columns)*(cardH+58);
    _rewardImages[i].frame=CGRectMake(px,py,cardW,cardH);
-   _rewardLabels[i].frame=CGRectMake(px,py+cardH,cardW,40);
+   _rewardLabels[i].frame=CGRectMake(px,py+cardH,cardW,48);
   }
-  _grid.contentSize=CGSizeMake(usable,8+std::ceil(double(_rewardImages.count)/columns)*(cardH+44));
+  CGFloat end=std::ceil(double(_rewardImages.count)/columns)*(cardH+58);
+  _again.frame=CGRectMake((usable-112)/2,end,112,42);
+  _grid.contentSize=CGSizeMake(usable,end+54);
  }
 }
 - (void)advance:(CADisplayLink*)link{
@@ -267,12 +310,17 @@ UILabel* label(CGFloat size,UIColor* color){
  _pack.layer.transform=CATransform3DRotate(perspective,std::cos(angle)<0?angle-M_PI:angle,0,1,0);
  _podium.elapsed=MAX(0,elapsed);[_podium setNeedsDisplay];
 }
-- (void)updateStars{_stars.text=[NSString stringWithFormat:@"★ %ld",(long)_balance];}
+- (void)updateStars{
+ NSString* number=[NSNumberFormatter localizedStringFromNumber:@(_balance) numberStyle:NSNumberFormatterDecimalStyle];
+ _stars.text=[@"★ " stringByAppendingString:number];[self.view setNeedsLayout];
+}
 - (void)busy:(BOOL)on{
  _pending=on;_close.enabled=!on;_boxes.userInteractionEnabled=!on;_giftRow.userInteractionEnabled=!on;
 }
 - (void)open:(UIButton*)button{
  if(_pending||_revealing||!self.openPacks)return;
+ int cost=Legend::Gacha::price(int(button.tag));
+ if(_balance<cost){_message.text=[NSString stringWithFormat:@"Cần %d sao để mở ×%ld.",cost,(long)button.tag];return;}
  [self.view endEditing:YES];[self busy:YES];_message.text=nil;
  __weak LGGachaController* weak=self;
  self.openPacks(button.tag,_balance,^(NSInteger stars,NSArray<NSNumber*>* cards,NSString* error){
@@ -305,8 +353,9 @@ UILabel* label(CGFloat size,UIColor* color){
  _opening=[AVPlayer playerWithPlayerItem:item];
  _openingLayer=[AVPlayerLayer playerLayerWithPlayer:_opening];
  _openingLayer.frame=self.view.bounds;_openingLayer.opacity=0;
- _openingLayer.videoGravity=AVLayerVideoGravityResizeAspectFill;
+ _openingLayer.videoGravity=AVLayerVideoGravityResizeAspect;
  [self.view.layer insertSublayer:_openingLayer below:_stars.layer];
+ [self.view setNeedsLayout];
  __weak LGGachaController* weak=self;
  _openingEnd=[NSNotificationCenter.defaultCenter addObserverForName:AVPlayerItemDidPlayToEndTimeNotification
   object:item queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification* note){
@@ -339,7 +388,7 @@ UILabel* label(CGFloat size,UIColor* color){
  _rewardLoop=[AVPlayerLooper playerLooperWithPlayer:_rewardPlayer templateItem:[AVPlayerItem playerItemWithURL:url]];
  _rewardLayer=[AVPlayerLayer playerLayerWithPlayer:_rewardPlayer];
  _rewardLayer.frame=self.view.bounds;_rewardLayer.opacity=0;
- _rewardLayer.videoGravity=AVLayerVideoGravityResizeAspectFill;
+ _rewardLayer.videoGravity=AVLayerVideoGravityResize;
  [self.view.layer insertSublayer:_rewardLayer below:_results.layer];
  [_rewardPlayer play];
 }
@@ -347,7 +396,7 @@ UILabel* label(CGFloat size,UIColor* color){
  ++_animation;
  _revealing=NO;
  _results.hidden=NO;_menu.hidden=YES;
- for(UIView* old in _grid.subviews)[old removeFromSuperview];
+ for(UIView* old in _grid.subviews)if(old!=_again)[old removeFromSuperview];
  _rewardImages=[NSMutableArray array];_rewardLabels=[NSMutableArray array];
  int tier=0;
  for(NSNumber* number in cards){
@@ -355,9 +404,12 @@ UILabel* label(CGFloat size,UIColor* color){
   if(id<1||id>_game->cardCount)continue;
   UIImageView* view=[[UIImageView alloc]init];view.contentMode=UIViewContentModeScaleAspectFit;
   [_grid addSubview:view];[_rewardImages addObject:view];
-  UILabel* name=label(11,LGGold());name.numberOfLines=2;name.text=LGText(_game->names[id]);
+  UILabel* name=label(12,LGGold());name.numberOfLines=2;name.text=LGText(_game->names[id]);
   [_grid addSubview:name];[_rewardLabels addObject:name];
   if(NSUInteger(id)<_tiers.count)tier=MAX(tier,[_tiers[id]intValue]);
+  view.alpha=name.alpha=0;
+  [UIView animateWithDuration:.19 delay:(_rewardImages.count-1)*.065 options:UIViewAnimationOptionCurveEaseOut
+   animations:^{view.alpha=name.alpha=1;} completion:nil];
   dispatch_async(_queue,^{
    UIImage* art=mediaImage(self->_media,[NSString stringWithFormat:@"cards/%03d.webp",id]);
    if(!art){try{art=LGPixels(self->_game->art(id),102,96);}catch(const std::exception&){}}
@@ -374,6 +426,7 @@ UILabel* label(CGFloat size,UIColor* color){
  [_stinger stop];_stinger=nil;
  [self stopRewardBackdrop];
  _results.hidden=YES;_menu.hidden=NO;_menu.userInteractionEnabled=YES;
+ _choices.contentOffset=CGPointZero;
 }
 - (void)close{
  if(_pending)return;

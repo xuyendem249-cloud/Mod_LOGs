@@ -1,9 +1,13 @@
 #import <Foundation/Foundation.h>
+#import <TargetConditionals.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
 /// Local, device-bound keys for authenticated SAVE data.
 @interface LGSaveVault : NSObject
+#if TARGET_OS_SIMULATOR
+- (nullable instancetype)initForSimulatorSmoke;
+#endif
 - (nullable NSData*)seal:(NSData*)data
                  purpose:(NSString*)purpose
                    error:(NSError* _Nullable * _Nullable)error;

@@ -10,7 +10,7 @@ def main(sdk):
  clang=capture(['xcrun','--sdk',sdk,'--find','clang++'])
  folder=ROOT/'build'/sdk;app=folder/'Legend.app';app.mkdir(exist_ok=True)
  target='arm64-apple-ios17.0'+('-simulator' if sdk=='iphonesimulator' else '')
- app_sources=('main.mm','LegendViews.mm','LegendSaveVault.mm','LegendGiftCodes.mm','LegendGachaView.mm','SealedDisc.mm')
+ app_sources=('main.mm','LegendViews.mm','LegendConsoleSkin.mm','LegendSaveVault.mm','LegendGiftCodes.mm','LegendGachaView.mm','SealedDisc.mm')
  core_sources=('PlayerCore.cpp','Digest.cpp','GameData.cpp','FusionAdvisor.cpp','CollectionSnapshot.cpp',
                'DeckPlanner.cpp','DeckTransfer.cpp','Gacha.cpp','WalletGuard.cpp','BundledDiscVfs.cpp')
  sources=[*(ROOT/'Sources/App'/name for name in app_sources),*(ROOT/'Sources/Core'/name for name in core_sources)]
@@ -20,7 +20,7 @@ def main(sdk):
  for framework in ['UIKit','Foundation','CoreFoundation','CoreGraphics','AVFoundation','AudioToolbox','QuartzCore','UniformTypeIdentifiers','GameController','Security']:args+=['-framework',framework]
  args+=['-lobjc','-lz'];run(args)
  info=plistlib.loads((ROOT/'Resources/Info.plist').read_bytes());info['CFBundleSupportedPlatforms']=['iPhoneSimulator' if sdk=='iphonesimulator' else 'iPhoneOS'];info['DTPlatformName']=sdk;info['DTSDKName']=sdk+capture(['xcrun','--sdk',sdk,'--show-sdk-version'])
- for name in ['AppLogo.png','welcome.png','DuelTemple-v1.png','LICENSES.txt']:shutil.copyfile(ROOT/'Resources'/name,app/name)
+ for name in ['AppLogo.png','welcome.png','LICENSES.txt']:shutil.copyfile(ROOT/'Resources'/name,app/name)
  # Use Apple's own asset compiler for the app icon. Never package personal game files.
  catalog=folder/'Assets.xcassets';icon=catalog/'AppIcon.appiconset';icon.mkdir(parents=True,exist_ok=True)
  run(['sips','-z','1024','1024',ROOT/'Resources/AppLogo.png','--out',icon/'AppIcon.png'])
@@ -30,11 +30,7 @@ def main(sdk):
  run(['xcrun','actool',catalog,'--compile',app,'--platform',sdk,'--minimum-deployment-target','17.0','--target-device','iphone','--target-device','ipad','--app-icon','AppIcon','--output-partial-info-plist',partial,'--output-format','human-readable-text'])
  info.update(plistlib.loads(partial.read_bytes()));(app/'Info.plist').write_bytes(plistlib.dumps(info))
  # Simulator ad-hoc signing needs no Apple identity. Device output is intentionally unsigned.
- if sdk=='iphonesimulator':
-  identifier='SIMULATOR0.'+info['CFBundleIdentifier']
-  entitlements=folder/'simulator-entitlements.plist'
-  entitlements.write_bytes(plistlib.dumps({'application-identifier':identifier,'keychain-access-groups':[identifier]}))
-  run(['codesign','--force','--sign','-','--entitlements',entitlements,app])
+ if sdk=='iphonesimulator':run(['codesign','--force','--sign','-',app])
  report={'stage':3,'app_version':info['CFBundleShortVersionString'],'app_build':info['CFBundleVersion'],'sdk':sdk,'target':target,'apple_sdk_app_compiled':True,'signed_for_device':False,'installable_on_iphone':False,'testflight_uploaded':False,'game_or_bios_tested':False,'executable_sha256':hashlib.sha256((app/'Legend').read_bytes()).hexdigest()}
  archive=folder/('Legend-Step2-'+sdk+'-unsigned-app.zip')
  with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:

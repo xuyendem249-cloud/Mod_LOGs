@@ -11,7 +11,8 @@ NSString* LGText(const std::string&);
 NSString* LGOrder(const std::vector<int>&);
 NSAttributedString* LGDescription(Legend::GameData&,int);
 @interface LGBackdrop:UIView
-@property(nonatomic,readonly) BOOL hasApprovedArtwork;
+@property(nonatomic) CGRect controllerFrame,bezelFrame;
+@property(nonatomic) CGFloat bezelRadius;
 @end
 @interface LGAutoButton:UIButton
 @property(nonatomic) BOOL running;

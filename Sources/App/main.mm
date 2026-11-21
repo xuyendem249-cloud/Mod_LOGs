@@ -7,6 +7,7 @@
 #include <memory>
 #include <cmath>
 #import "LegendViews.hpp"
+#import "LegendConsoleSkin.hpp"
 #import "LegendSaveVault.h"
 #import "LegendGiftCodes.hpp"
 #import "LegendGachaView.hpp"
@@ -23,6 +24,7 @@ static UIColor* Gold(){return LGGold();}
 static UIColor* Ink(){return LGInk();}
 static NSString* const LGErrorDomain=@"LegendPlayer";
 static NSError* Failure(NSString* text){return [NSError errorWithDomain:LGErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey:text}];}
+namespace Skin=Legend::ConsoleSkin;
 
 @interface LGPadButton:UIButton
 @property(nonatomic) NSInteger padID;
@@ -30,33 +32,78 @@ static NSError* Failure(NSString* text){return [NSError errorWithDomain:LGErrorD
 @end
 @implementation LGPadButton
 - (instancetype)initWithFrame:(CGRect)frame {
- if((self=[super initWithFrame:frame])){self.exclusiveTouch=NO;self.padID=-1;self.layer.cornerRadius=16;self.layer.borderWidth=1.4;self.layer.borderColor=Gold().CGColor;self.backgroundColor=[UIColor colorWithRed:.15 green:.13 blue:.24 alpha:1];self.titleLabel.font=[UIFont boldSystemFontOfSize:19];
+ if((self=[super initWithFrame:frame])){self.exclusiveTouch=NO;self.padID=-1;self.backgroundColor=UIColor.clearColor;self.opaque=NO;self.contentMode=UIViewContentModeRedraw;
  [self addTarget:self action:@selector(down) forControlEvents:UIControlEventTouchDown|UIControlEventTouchDragEnter];
  [self addTarget:self action:@selector(up) forControlEvents:UIControlEventTouchUpInside|UIControlEventTouchUpOutside|UIControlEventTouchCancel|UIControlEventTouchDragExit];}return self;
 }
 - (void)down{if(self.change)self.change(YES);}
 - (void)up{if(self.change)self.change(NO);}
-- (void)setHighlighted:(BOOL)value{[super setHighlighted:value];self.backgroundColor=value?[UIColor colorWithRed:.38 green:.28 blue:.38 alpha:1]:[UIColor colorWithRed:.15 green:.13 blue:.24 alpha:1];self.layer.borderWidth=value?3:1.4;[self setNeedsDisplay];}
+- (void)setHighlighted:(BOOL)value{[super setHighlighted:value];[self setNeedsDisplay];}
+- (void)setSelected:(BOOL)value{[super setSelected:value];[self setNeedsDisplay];}
+- (BOOL)isFace{return self.padID==0||self.padID==1||self.padID==8||self.padID==9;}
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent*)event{
+ if(![super pointInside:point withEvent:event])return NO;
+ if(![self isFace])return YES;
+ CGFloat radius=MIN(self.bounds.size.width,self.bounds.size.height)*.5;
+ return hypot(point.x-CGRectGetMidX(self.bounds),point.y-CGRectGetMidY(self.bounds))<=radius;
+}
 - (void)drawRect:(CGRect)rect {
- [super drawRect:rect];NSInteger key=self.padID;if(key<0||key>=10||key==2||key==3)return;
- CGContextRef c=UIGraphicsGetCurrentContext();CGFloat cx=CGRectGetMidX(self.bounds),cy=CGRectGetMidY(self.bounds),r=MIN(rect.size.width,rect.size.height)*.23;
- UIColor* color=key==0?[UIColor colorWithRed:.5 green:.73 blue:1 alpha:1]:key==1?[UIColor colorWithRed:.85 green:.59 blue:.85 alpha:1]:key==8?[UIColor colorWithRed:1 green:.52 blue:.57 alpha:1]:key==9?[UIColor colorWithRed:.55 green:.88 blue:.64 alpha:1]:Gold();
- CGContextSetStrokeColorWithColor(c,color.CGColor);CGContextSetFillColorWithColor(c,color.CGColor);CGContextSetLineWidth(c,MAX(2,r*.15));CGContextSetLineJoin(c,kCGLineJoinRound);
+ NSInteger key=self.padID;
+ CGContextRef c=UIGraphicsGetCurrentContext();
+ CGFloat cx=CGRectGetMidX(self.bounds),cy=CGRectGetMidY(self.bounds),size=MIN(cx,cy);
+ if(![self isFace]){
+  Skin::key(c,CGRectInset(self.bounds,1,1),key<0?cy*.5:size*.65,self.highlighted,self.selected);
+  if(self.titleLabel.text.length){
+   UIColor* ink=Skin::color(self.selected?0xffe2c077:0xffcbd2dd);
+   CGFloat maxSize=key==2||key==3||key<0?11:15;
+   UIFont* font=[UIFont systemFontOfSize:MIN(maxSize,size*.75) weight:key<0?UIFontWeightBold:UIFontWeightMedium];
+   NSDictionary* attributes=@{NSFontAttributeName:font,NSForegroundColorAttributeName:ink};
+   CGSize textSize=[self.titleLabel.text sizeWithAttributes:attributes];
+   [self.titleLabel.text drawAtPoint:CGPointMake(cx-textSize.width/2,cy-textSize.height/2+(self.highlighted?1:-1)) withAttributes:attributes];
+  }
+  return;
+ }
+ uint32_t tint=key==9?0xff67dfc8:key==1?0xffedb0ef:key==8?0xfffa7b87:0xff7dcaff;
+ Skin::face(c,{cx,cy-1},size-2,self.highlighted,tint);
+ if(self.highlighted)cy+=1;
+ CGFloat r=size*.48;
+ CGContextSetStrokeColorWithColor(c,Skin::color(tint).CGColor);CGContextSetLineWidth(c,MAX(2,r*.18));
+ CGContextSetLineCap(c,kCGLineCapRound);CGContextSetLineJoin(c,kCGLineJoinRound);
  switch(key){
  case 0:CGContextMoveToPoint(c,cx-r,cy-r);CGContextAddLineToPoint(c,cx+r,cy+r);CGContextMoveToPoint(c,cx+r,cy-r);CGContextAddLineToPoint(c,cx-r,cy+r);break;
  case 1:CGContextStrokeRect(c,CGRectMake(cx-r,cy-r,r*2,r*2));return;
  case 8:CGContextStrokeEllipseInRect(c,CGRectMake(cx-r,cy-r,r*2,r*2));return;
- case 9:CGContextMoveToPoint(c,cx,cy-r);CGContextAddLineToPoint(c,cx+r,cy+r*.8);CGContextAddLineToPoint(c,cx-r,cy+r*.8);CGContextClosePath(c);break;
- default:{CGFloat dx=key==6?-1:key==7?1:0,dy=key==4?-1:key==5?1:0;CGContextMoveToPoint(c,cx+dx*r,cy+dy*r);CGContextAddLineToPoint(c,cx-dx*r-dy*r*.75,cy-dy*r+dx*r*.75);CGContextAddLineToPoint(c,cx-dx*r+dy*r*.75,cy-dy*r-dx*r*.75);CGContextClosePath(c);CGContextFillPath(c);return;}
+ case 9:CGContextMoveToPoint(c,cx,cy-r);CGContextAddLineToPoint(c,cx+r,cy+r*.83);CGContextAddLineToPoint(c,cx-r,cy+r*.83);CGContextClosePath(c);break;
  }CGContextStrokePath(c);
 }
 @end
 
+@interface LGQuickButton:UIButton
+@property(nonatomic,copy) NSString* glyph;
+@end
+@implementation LGQuickButton
+- (void)setHighlighted:(BOOL)value{[super setHighlighted:value];[self setNeedsDisplay];}
+- (void)setSelected:(BOOL)value{[super setSelected:value];[self setNeedsDisplay];}
+- (void)drawRect:(CGRect)rect{
+ Skin::quick(UIGraphicsGetCurrentContext(),self.bounds,self.glyph,self.selected||self.highlighted,
+  self.selected&&[self.glyph isEqualToString:@"sound"]);
+}
+@end
+
+@interface LGFaceWell:UIView
+@end
+@implementation LGFaceWell
+- (void)drawRect:(CGRect)rect{Skin::well(UIGraphicsGetCurrentContext(),MIN(self.bounds.size.width,self.bounds.size.height));}
+@end
+
 @interface LGDirectionPad:UIView
 @property(nonatomic,copy) void(^changed)(uint16_t);
+@property(nonatomic) uint16_t held;
 @end
 @implementation LGDirectionPad
-- (void)update:(NSSet<UITouch*>*)touches{CGPoint p=[touches.anyObject locationInView:self];CGFloat x=p.x/self.bounds.size.width,y=p.y/self.bounds.size.height;uint16_t mask=0;if(x>=0&&y>=0&&x<=1&&y<=1){if(x<.38)mask|=1<<6;if(x>.62)mask|=1<<7;if(y<.38)mask|=1<<4;if(y>.62)mask|=1<<5;}if(self.changed)self.changed(mask);}
+- (void)setHeld:(uint16_t)value{if(_held==value)return;_held=value;[self setNeedsDisplay];}
+- (void)drawRect:(CGRect)rect{Skin::rocker(UIGraphicsGetCurrentContext(),MIN(self.bounds.size.width,self.bounds.size.height),self.held);}
+- (void)update:(NSSet<UITouch*>*)touches{CGPoint p=[touches.anyObject locationInView:self];CGFloat x=p.x/self.bounds.size.width,y=p.y/self.bounds.size.height;uint16_t mask=0;if(x>=0&&y>=0&&x<1&&y<1){if(x<.34)mask|=1<<6;if(x>.66)mask|=1<<7;if(y<.34)mask|=1<<4;if(y>.66)mask|=1<<5;}if(self.changed)self.changed(mask);}
 - (void)touchesBegan:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event{[self update:touches];}
 - (void)touchesMoved:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event{[self update:touches];}
 - (void)touchesEnded:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event{if(self.changed)self.changed(0);}
@@ -81,7 +128,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  UIButton* _sound;
  UIButton* _mode;
  UILabel* _speedBadge;
- UIView* _bezel;
+ LGFaceWell* _faceWell;
  std::atomic<bool> _autoEnabled;
  std::atomic<bool> _transactionCancelled;
  std::atomic<uint64_t> _autoGeneration;
@@ -153,10 +200,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  if(key)_giftCodes=[[LGGiftCodes alloc]initWithVault:_vault
   path:[[_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:@"gift-codes.sealed"]
   issuer:key];
- _bezel=[[UIView alloc]init];_bezel.backgroundColor=[UIColor colorWithWhite:.02 alpha:1];
- _bezel.layer.borderColor=[Gold() colorWithAlphaComponent:.65].CGColor;_bezel.layer.borderWidth=1;
- _bezel.userInteractionEnabled=NO;[self.view addSubview:_bezel];
- _screen=[[UIImageView alloc]init];_screen.backgroundColor=UIColor.blackColor;_screen.contentMode=UIViewContentModeScaleToFill;_screen.clipsToBounds=YES;[self.view addSubview:_screen];
+ _screen=[[UIImageView alloc]init];_screen.backgroundColor=Skin::color(0xff050507);_screen.contentMode=UIViewContentModeScaleToFill;_screen.clipsToBounds=YES;[self.view addSubview:_screen];
  [self setImageFilter:_imageFilter.load()];
  _placeholder=[[UILabel alloc]init];_placeholder.text=@"Mở menu để nhập BIOS và chọn game";_placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
  _welcome=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"welcome.png"]];_welcome.contentMode=UIViewContentModeScaleAspectFit;[_screen addSubview:_welcome];
@@ -167,42 +211,43 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _quickNotice.backgroundColor=[UIColor colorWithWhite:.03 alpha:.82];
  _quickNotice.layer.cornerRadius=8;_quickNotice.clipsToBounds=YES;[_screen addSubview:_quickNotice];
  _guide=[[UITableView alloc]initWithFrame:CGRectZero style:UITableViewStylePlain];_guide.dataSource=self;_guide.delegate=self;_guide.backgroundColor=Ink();_guide.rowHeight=UITableViewAutomaticDimension;_guide.estimatedRowHeight=100;_guide.separatorColor=[Gold()colorWithAlphaComponent:.3];[self.view addSubview:_guide];
- _menu=[self tool:@"line.3.horizontal" label:@"Menu Legend" action:@selector(menu)];
- _save=[self tool:@"square.and.arrow.down" label:@"Lưu nhanh" action:@selector(save)];
- _load=[self tool:@"doc.text.magnifyingglass" label:@"Tải nhanh" action:@selector(load)];
- _sound=[self tool:@"speaker.wave.2" label:@"Âm thanh game" action:@selector(toggleSound)];
- _mode=[[LGPadButton alloc]init];[_mode setTitle:@"MODE" forState:UIControlStateNormal];_mode.titleLabel.font=[UIFont boldSystemFontOfSize:12];
+ _menu=[self tool:@"menu" label:@"Menu Legend" action:@selector(menu)];
+ _save=[self tool:@"save" label:@"Lưu nhanh" action:@selector(save)];
+ _load=[self tool:@"load" label:@"Tải nhanh" action:@selector(load)];
+ _sound=[self tool:@"sound" label:@"Âm thanh game" action:@selector(toggleSound)];
+ _mode=[[LGPadButton alloc]init];[_mode setTitle:@"MODE" forState:UIControlStateNormal];[_mode setTitleColor:UIColor.clearColor forState:UIControlStateNormal];
  [_mode addTarget:self action:@selector(toggleController) forControlEvents:UIControlEventTouchUpInside];
  _mode.accessibilityLabel=@"Nhận tay cầm";[self.view addSubview:_mode];[self updateModeButton];
  _logo=[[LGAutoButton alloc]initWithFrame:CGRectZero];[_logo addTarget:self action:@selector(toggleAuto) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_logo];
- _speedButton=[self tool:@"forward.fill" label:@"Tốc độ game" action:@selector(toggleSpeed)];
+ _speedButton=[self tool:@"speed" label:@"Tốc độ game" action:@selector(toggleSpeed)];
  _speedBadge=[[UILabel alloc]init];_speedBadge.font=[UIFont boldSystemFontOfSize:9];_speedBadge.textColor=Gold();_speedBadge.textAlignment=NSTextAlignmentCenter;_speedBadge.hidden=YES;_speedBadge.userInteractionEnabled=NO;[self.view addSubview:_speedBadge];
  _speedButton.accessibilityValue=@"1×";
  [_speedButton addGestureRecognizer:[[UILongPressGestureRecognizer alloc]initWithTarget:self action:@selector(speedHeld:)]];
  _pads=[NSMutableDictionary dictionary];NSArray* names=@[@"X",@"Vuông",@"Select",@"Start",@"Lên",@"Xuống",@"Trái",@"Phải",@"Tròn",@"Tam giác",@"L1",@"R1",@"L2",@"R2"];
+ _faceWell=[[LGFaceWell alloc]init];_faceWell.opaque=NO;_faceWell.backgroundColor=UIColor.clearColor;
+ _faceWell.contentMode=UIViewContentModeRedraw;_faceWell.userInteractionEnabled=NO;[self.view addSubview:_faceWell];
  __weak LGPlayer* weak=self;
- for(NSInteger i=0;i<14;i++){LGPadButton* b=[[LGPadButton alloc]init];b.padID=i;b.accessibilityLabel=names[i];if(i>=10||i==2||i==3){[b setTitle:[names[i] uppercaseString] forState:UIControlStateNormal];b.titleLabel.font=[UIFont boldSystemFontOfSize:12];}b.change=^(BOOL down){LGPlayer* owner=weak;if(owner&&owner->_core)[owner button:(unsigned)i down:down source:0];};_pads[@(i)]=b;[self.view addSubview:b];}
+ for(NSInteger i=0;i<14;i++){LGPadButton* b=[[LGPadButton alloc]init];b.padID=i;b.accessibilityLabel=names[i];
+  if(i>=10||i==2||i==3){[b setTitle:[names[i] uppercaseString] forState:UIControlStateNormal];[b setTitleColor:UIColor.clearColor forState:UIControlStateNormal];}
+  b.hidden=i>=4&&i<=7;
+  b.change=^(BOOL down){LGPlayer* owner=weak;if(owner&&owner->_core)[owner button:(unsigned)i down:down source:0];};_pads[@(i)]=b;[self.view addSubview:b];}
  _dpad=[[LGDirectionPad alloc]init];_dpad.backgroundColor=UIColor.clearColor;_dpad.changed=^(uint16_t mask){LGPlayer* owner=weak;if(owner){uint16_t next=(owner->_sources[0]&~uint16_t(0xf0))|mask;[owner source:0 mask:next];}};[self.view addSubview:_dpad];
+ _dpad.opaque=NO;_dpad.contentMode=UIViewContentModeRedraw;_dpad.accessibilityLabel=@"Phím di chuyển";_dpad.isAccessibilityElement=YES;
  [[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(controllers) name:GCControllerDidConnectNotification object:nil];[[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(controllers) name:GCControllerDidDisconnectNotification object:nil];[self controllers];
  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(background) name:UIApplicationWillResignActiveNotification object:nil];[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(foreground) name:UIApplicationDidBecomeActiveNotification object:nil];
  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioInterrupted:) name:AVAudioSessionInterruptionNotification object:nil];
  _displayLink=[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];_displayLink.preferredFrameRateRange=CAFrameRateRangeMake(30,60,60);[_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
 }
 - (UIButton*)tool:(NSString*)symbol label:(NSString*)label action:(SEL)action{
- UIButton* button=[UIButton buttonWithType:UIButtonTypeSystem];
- button.tintColor=UIColor.whiteColor;
- button.backgroundColor=[UIColor colorWithWhite:.035 alpha:.72];
- button.layer.cornerRadius=9;
- button.layer.borderWidth=.5;
- button.layer.borderColor=[UIColor colorWithWhite:.7 alpha:.45].CGColor;
- UIImageSymbolConfiguration* icon=[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
- [button setImage:[UIImage systemImageNamed:symbol withConfiguration:icon] forState:UIControlStateNormal];
+ LGQuickButton* button=[[LGQuickButton alloc]init];
+ button.glyph=symbol;button.backgroundColor=UIColor.clearColor;
+ button.opaque=NO;button.contentMode=UIViewContentModeRedraw;
  button.accessibilityLabel=label;
  [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
  [self.view addSubview:button];
  return button;
 }
-- (void)releaseButtons{_sources[0]=_sources[1]=_sources[2]=_combined=0;_core->input.clear();for(LGPadButton* b in _pads.allValues)b.highlighted=NO;}
+- (void)releaseButtons{_sources[0]=_sources[1]=_sources[2]=_combined=0;_core->input.clear();_dpad.held=0;for(LGPadButton* b in _pads.allValues)b.highlighted=NO;}
 - (BOOL)hasBundledGame{
  return [NSFileManager.defaultManager fileExistsAtPath:[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"mod2/content.sealed"].path];
 }
@@ -215,28 +260,39 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator{[self releaseButtons];_clock=0;[super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];[coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context){[self.view setNeedsLayout];} completion:nil];}
 - (void)cluster:(CGRect)area right:(BOOL)right {
- CGFloat s=MIN(area.size.width,area.size.height);CGRect box=CGRectMake(CGRectGetMidX(area)-s/2,CGRectGetMidY(area)-s/2,s,s);CGFloat u=s/3;
+ CGFloat s=MIN(area.size.width,area.size.height);CGRect box=CGRectMake(CGRectGetMidX(area)-s/2,CGRectGetMidY(area)-s/2,s,s);
  NSArray* ids=right?@[@9,@0,@1,@8]:@[@4,@5,@6,@7];const CGPoint points[4]={CGPointMake(1,0),CGPointMake(1,2),CGPointMake(0,1),CGPointMake(2,1)};
- for(NSUInteger i=0;i<4;i++){CGPoint p=points[i];_pads[ids[i]].frame=CGRectInset(CGRectMake(box.origin.x+p.x*u,box.origin.y+p.y*u,u,u),2,2);}
+ if(right)_faceWell.frame=box;
+ for(NSUInteger i=0;i<4;i++){
+  CGPoint p=points[i];CGFloat edge=s*.368;
+  _pads[ids[i]].frame=CGRectMake(box.origin.x+s*(.205+p.x*.295)-edge/2,
+   box.origin.y+s*(.205+p.y*.295)-edge/2,edge,edge);
+ }
 }
 - (void)viewDidLayoutSubviews {
  [super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);Legend::ControllerGeometry g(a.size.width,a.size.height,_fusionMode==2);CGPoint o=a.origin;
- _bezel.frame=LGRect(g.bezel,o);_bezel.layer.cornerRadius=g.portrait?20:17;
- _screen.frame=LGRect(g.game,o);_screen.layer.cornerRadius=_fusionMode==2&&!g.portrait?0:16;_guide.frame=LGRect(g.guide,o);_guide.hidden=_fusionMode!=2;
+ LGBackdrop* deck=(LGBackdrop*)self.view;
+ deck.controllerFrame=a;deck.bezelFrame=LGRect(g.bezel,o);deck.bezelRadius=g.portrait?20:17;
+ _screen.frame=LGRect(g.game,o);_screen.layer.cornerRadius=g.portrait?19:16;_guide.frame=LGRect(g.guide,o);_guide.hidden=_fusionMode!=2;
  _pads[@12].frame=LGRect(g.shoulder(false,false),o);_pads[@10].frame=LGRect(g.shoulder(false,true),o);_pads[@11].frame=LGRect(g.shoulder(true,false),o);_pads[@13].frame=LGRect(g.shoulder(true,true),o);
  [self cluster:LGRect(g.pad(false),o) right:NO];[self cluster:LGRect(g.pad(true),o) right:YES];_dpad.frame=LGRect(g.pad(false),o);
  _pads[@2].frame=LGRect(g.selectStart(false),o);_pads[@3].frame=LGRect(g.selectStart(true),o);_logo.frame=LGRect(g.logo(),o);_mode.frame=LGRect(g.mode(),o);
  NSArray<UIButton*>* actions=@[_speedButton,_sound,_save,_load];
- for(size_t i=0;i<actions.count;i++)actions[i].frame=CGRectInset(LGRect(g.quickAction(int(i)),o),3,4);
- _speedBadge.frame=CGRectMake(CGRectGetMinX(_speedButton.frame),CGRectGetMaxY(_speedButton.frame)-11,_speedButton.frame.size.width,10);
- _menu.frame=CGRectInset(LGRect(g.menu(),o),4,4);
- _placeholder.frame=CGRectInset(_screen.bounds,20,20);_welcome.frame=CGRectInset(_screen.bounds,10,10);_welcome.hidden=_ready;_overlay.frame=_screen.bounds;_overlay.hidden=_fusionMode==0;
+ for(size_t i=0;i<actions.count;i++)actions[i].frame=LGRect(g.quickAction(int(i)),o);
+ _speedBadge.frame=CGRectMake(CGRectGetMinX(_speedButton.frame),CGRectGetMidY(_speedButton.frame)+3,_speedButton.frame.size.width,10);
+ _menu.frame=LGRect(g.menu(),o);
+ _placeholder.frame=CGRectInset(_screen.bounds,20,20);_welcome.frame=CGRectInset(_screen.bounds,15,10);_welcome.hidden=_ready;_overlay.frame=_screen.bounds;_overlay.hidden=_fusionMode==0;
  _quickNotice.frame=CGRectMake(12,8,MAX(1,_screen.bounds.size.width-60),28);
- _save.enabled=_load.enabled=_ready;_save.alpha=_load.alpha=_ready?1:.4;[self.view setNeedsDisplay];
+ _save.enabled=_load.enabled=_ready;[self.view setNeedsDisplay];
 }
 
 - (void)smokeProgress:(NSString*)phase{[phase writeToFile:[_root stringByAppendingPathComponent:@"smoke-progress.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];NSLog(@"Legend smoke: %@",phase);}
 - (BOOL)smokeQuickSlot{
+#if TARGET_OS_SIMULATOR
+ LGSaveVault* vault=[[LGSaveVault alloc]initForSimulatorSmoke];
+ if(!vault)return NO;
+ LGQuickSlots* writer=[[LGQuickSlots alloc]initWithVault:vault];
+ LGQuickSlots* reader=[[LGQuickSlots alloc]initWithVault:vault];
  NSMutableData* sample=[NSMutableData dataWithLength:32*1024];
  auto* contents=static_cast<uint8_t*>(sample.mutableBytes);
  for(size_t i=0;i<sample.length;i++)contents[i]=uint8_t(i%61);
@@ -244,18 +300,21 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   [NSString stringWithFormat:@"legend-smoke-%@.slot",NSUUID.UUID.UUIDString]];
  NSString* purpose=@"legend/smoke/quick-slot";
  NSError* error=nil;
- BOOL written=[_quickSlots writeState:sample path:path purpose:purpose error:&error];
- BOOL restored=written&&[[_quickSlots readState:path purpose:purpose error:&error] isEqualToData:sample];
- BOOL bound=restored&&![_quickSlots readState:path purpose:@"legend/smoke/other-slot" error:nil];
+ BOOL written=[writer writeState:sample path:path purpose:purpose error:&error];
+ BOOL restored=written&&[[reader readState:path purpose:purpose error:&error] isEqualToData:sample];
+ BOOL bound=restored&&![reader readState:path purpose:@"legend/smoke/other-slot" error:nil];
  NSMutableData* corrupted=[NSMutableData dataWithContentsOfFile:path];
  if(corrupted.length>40){
   static_cast<uint8_t*>(corrupted.mutableBytes)[25]^=1;
   [corrupted writeToFile:path atomically:YES];
  }
- BOOL rejected=corrupted.length>40&&![_quickSlots readState:path purpose:purpose error:nil];
+ BOOL rejected=corrupted.length>40&&![reader readState:path purpose:purpose error:nil];
  [NSFileManager.defaultManager removeItemAtPath:path error:nil];
  [self smokeProgress:[NSString stringWithFormat:@"slot written=%d restored=%d bound=%d rejected=%d %@",written,restored,bound,rejected,error.localizedDescription?:@""]];
  return restored&&bound&&rejected;
+#else
+ return NO;
+#endif
 }
 - (void)runSmoke{
  [self smokeProgress:@"request orientation"];
@@ -278,7 +337,10 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  [self smokeProgress:@"check protected quick slot"];
  __block BOOL protectedSlot=NO;
  dispatch_sync(self->_slotIO,^{protectedSlot=[self smokeQuickSlot];});
- [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"approved_background_loaded":@([(LGBackdrop*)self.view hasApprovedArtwork]),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot)};
+ CGRect deck=((LGBackdrop*)self.view).bezelFrame;
+ BOOL console=CGRectContainsRect(deck,self->_screen.frame)&&CGRectContainsRect(safe,self->_faceWell.frame)&&
+  CGRectContainsRect(safe,self->_dpad.frame)&&self->_pads[@4].hidden&&self->_pads[@8].frame.size.width>0;
+ [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"console_skin_layout":@(console),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot),@"device_keychain_tested":@NO};
  NSData* json=[NSJSONSerialization dataWithJSONObject:report options:0 error:nil];[json writeToFile:[self->_root stringByAppendingPathComponent:[NSString stringWithFormat:@"simulator_smoke-%@.json",mode]] atomically:YES];
  });
 }
@@ -349,8 +411,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  if(_speed>1)_boostSpeed=_speed;
  _speedBadge.hidden=_speed<=1;
  _speedBadge.text=_speedButton.accessibilityValue=LGText(Legend::playbackSpeedText(_speed));
- _speedButton.tintColor=_speed>1?Gold():UIColor.whiteColor;
- _speedButton.imageEdgeInsets=_speed>1?UIEdgeInsetsMake(-6,0,0,0):UIEdgeInsetsZero;
+ _speedButton.selected=_speed>1;
  double speed=_speed;
  dispatch_async(_worker,^{self->_core->setSpeed(speed);});
 }
@@ -362,13 +423,11 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _muted=!_muted;
  _audioEngine.mainMixerNode.outputVolume=_muted?0:_volume;
  _sound.accessibilityValue=_muted?@"Đang tắt":@"Đang bật";
- _sound.tintColor=_muted?Gold():UIColor.whiteColor;
- UIImageSymbolConfiguration* icon=[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
- [_sound setImage:[UIImage systemImageNamed:_muted?@"speaker.slash":@"speaker.wave.2" withConfiguration:icon] forState:UIControlStateNormal];
+ _sound.selected=_muted;
 }
 - (void)updateModeButton{
  _mode.accessibilityValue=_controllerEnabled?@"Đang bật":@"Đang tắt";
- [_mode setTitleColor:_controllerEnabled?Gold():UIColor.whiteColor forState:UIControlStateNormal];
+ _mode.selected=_controllerEnabled;
 }
 - (void)toggleController{
  _controllerEnabled=!_controllerEnabled;
@@ -784,6 +843,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (void)source:(unsigned)source mask:(uint16_t)mask{
  if(source>=3)return;if(source==1&&!_controllerEnabled)mask=0;if(mask&~_sources[source])[self stopAuto];if(_paused||_background||!_ready)mask=0;_sources[source]=mask;uint16_t next=_sources[0]|_sources[1]|_sources[2];for(unsigned i=0;i<14;i++)if((next^_combined)&(1<<i)){_core->input.button(i,(next&(1<<i))!=0);_pads[@(i)].highlighted=(next&(1<<i))!=0;}_combined=next;
+ _dpad.held=next&0xf0;
 }
 - (void)button:(unsigned)id down:(BOOL)down source:(unsigned)source{if(source<3&&id<14)[self source:source mask:down?(_sources[source]|(1<<id)):(_sources[source]&~(1<<id))];}
 - (void)controllers{

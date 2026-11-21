@@ -16,6 +16,9 @@ NSURL* mediaFile(NSURL* folder,NSString* name){
  NSURL* url=[folder URLByAppendingPathComponent:name];
  return [NSFileManager.defaultManager fileExistsAtPath:url.path]?url:nil;
 }
+NSString* giftText(NSString* key,NSString* fallback){
+ return [NSBundle.mainBundle localizedStringForKey:key value:fallback table:@"Gacha"];
+}
 UIButton* action(NSString* title,UIColor* color,id owner,SEL selector){
  UIButton* button=[UIButton buttonWithType:UIButtonTypeSystem];
  [button setTitle:title forState:UIControlStateNormal];
@@ -205,18 +208,18 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  _giftRow.spacing=7;_giftRow.layoutMargins=UIEdgeInsetsMake(0,10,0,6);_giftRow.layoutMarginsRelativeArrangement=YES;
  _giftRow.backgroundColor=color(0xe61b1930);_giftRow.layer.cornerRadius=6;
  _giftRow.layer.borderWidth=1;_giftRow.layer.borderColor=color(0xff78663c).CGColor;
- UILabel* gift=label(19,LGGold());gift.text=@"🎁";gift.accessibilityLabel=@"Mã quà Gacha";
+ UILabel* gift=label(19,LGGold());gift.text=@"🎁";gift.accessibilityLabel=giftText(@"gift_code",@"Mã quà");
  [gift.widthAnchor constraintEqualToConstant:32].active=YES;
  [_giftRow addArrangedSubview:gift];
  _code=[[UITextField alloc]init];
  _code.borderStyle=UITextBorderStyleNone;
  _code.backgroundColor=UIColor.clearColor;_code.textColor=UIColor.whiteColor;
  _code.autocorrectionType=UITextAutocorrectionTypeNo;_code.autocapitalizationType=UITextAutocapitalizationTypeNone;
- _code.accessibilityLabel=@"Mã quà Gacha";
+ _code.accessibilityLabel=giftText(@"gift_code",@"Mã quà");
  _code.returnKeyType=UIReturnKeyDone;[_code addTarget:self action:@selector(redeem) forControlEvents:UIControlEventEditingDidEndOnExit];
  [_giftRow addArrangedSubview:_code];
- UIButton* redeem=action(@"Đổi mã",slate(.19,.15,.27),self,@selector(redeem));
- [redeem.widthAnchor constraintEqualToConstant:78].active=YES;
+ UIButton* redeem=action(giftText(@"redeem_code",@"Đổi mã"),slate(.19,.15,.27),self,@selector(redeem));
+ [redeem.widthAnchor constraintGreaterThanOrEqualToConstant:78].active=YES;
  [_giftRow addArrangedSubview:redeem];
  [_menu addSubview:_giftRow];
  NSData* rarity=[NSData dataWithContentsOfURL:[_media URLByAppendingPathComponent:@"cards/tiers.json"]];
@@ -266,7 +269,8 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  _walletTint.frame=_stars.bounds;_closeTint.frame=_close.bounds;
  CGFloat top=y+53,width=MAX(1,w-32);
  CGFloat bottom=CGRectGetMaxY(safe);
- if(self.keyboardLayoutGuide.layoutFrame.origin.y>top)bottom=MIN(bottom,self.keyboardLayoutGuide.layoutFrame.origin.y);
+ CGFloat keyboardTop=self.view.keyboardLayoutGuide.layoutFrame.origin.y;
+ if(keyboardTop>top)bottom=MIN(bottom,keyboardTop);
  _choices.frame=CGRectMake(x,top,w,MAX(0,bottom-top));
  _menu.frame=CGRectMake(0,0,w,379);_choices.contentSize=_menu.frame.size;
  _pack.bounds=CGRectMake(0,0,144,225);_pack.center=CGPointMake(w/2,112.5);
@@ -339,7 +343,7 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  self.gift(_code.text?:@"",^(NSInteger stars,NSString* error){
   LGGachaController* owner=weak;if(!owner)return;
   [owner busy:NO];owner->_message.text=error;
-  if(!error){owner->_balance=stars;[owner updateStars];owner->_code.text=@"";owner->_message.text=@"Đã đổi mã";}
+  if(!error){owner->_balance=stars;[owner updateStars];owner->_code.text=@"";owner->_message.text=giftText(@"gift_redeemed",@"Đã cộng sao và SAVE.");}
  });
 }
 - (void)playOpening:(NSArray<NSNumber*>*)cards{

@@ -8,6 +8,9 @@
 #include <cmath>
 #import "LegendViews.hpp"
 #import "LegendSaveVault.h"
+#import "LegendGiftCodes.hpp"
+#import "LegendGachaView.hpp"
+#include "SealedDisc.hpp"
 #import <GameController/GameController.h>
 #include "CompatibilityTables.hpp"
 #include "ControllerGeometry.hpp"
@@ -92,6 +95,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  UILabel* _quickNotice;
  LGSaveVault* _vault;
  LGQuickSlots* _quickSlots;
+ LGGiftCodes* _giftCodes;
  UIButton* _menu;
  UIButton* _save;
  UIButton* _load;
@@ -110,6 +114,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  double _speed,_boostSpeed,_frameDebt,_lastSnapshot,_lastCardFlush;
  float _volume;
  BOOL _muted,_controllerEnabled;
+ BOOL _triedBundled;
+ bool _needsNativeLoad;
  LGFusionOverlay* _overlay;
  UITableView* _guide;
  LGDirectionPad* _dpad;
@@ -125,6 +131,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations{NSString* mode=NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE_ORIENTATION"];return [mode isEqualToString:@"landscape"]?UIInterfaceOrientationMaskLandscapeLeft:[mode isEqualToString:@"portrait"]?UIInterfaceOrientationMaskPortrait:UIInterfaceOrientationMaskAllButUpsideDown;}
 - (BOOL)prefersHomeIndicatorAutoHidden{return YES;}
 - (void)viewDidLoad {
+ _needsNativeLoad=true;
  [super viewDidLoad];self.view=[[LGBackdrop alloc]initWithFrame:self.view.bounds];self.view.multipleTouchEnabled=YES;
  _autoEnabled.store(false);_transactionCancelled.store(false);_autoGeneration.store(0);_autoFrame=0;
  UIApplication.sharedApplication.idleTimerDisabled=YES;
@@ -136,6 +143,11 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _controllerEnabled=[prefs objectForKey:@"gamepad_enabled"]?[prefs boolForKey:@"gamepad_enabled"]:YES;
  NSString* docs=NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES).firstObject;_root=[docs stringByAppendingPathComponent:@"Legend"];
  for(NSString* name in @[@"system",@"saves",@"content"]) [[NSFileManager defaultManager] createDirectoryAtPath:[_root stringByAppendingPathComponent:name] withIntermediateDirectories:YES attributes:nil error:nil];
+ NSURL* issuer=[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"gacha/gift_issuer.der"];
+ NSData* key=[NSData dataWithContentsOfURL:issuer];
+ if(key)_giftCodes=[[LGGiftCodes alloc]initWithVault:_vault
+  path:[[_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:@"gift-codes.sealed"]
+  issuer:key];
  _bezel=[[UIView alloc]init];_bezel.backgroundColor=[UIColor colorWithWhite:.02 alpha:1];
  _bezel.layer.borderColor=[Gold() colorWithAlphaComponent:.65].CGColor;_bezel.layer.borderWidth=1;
  _bezel.userInteractionEnabled=NO;[self.view addSubview:_bezel];
@@ -185,8 +197,15 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  return button;
 }
 - (void)releaseButtons{_sources[0]=_sources[1]=_sources[2]=_combined=0;_core->input.clear();for(LGPadButton* b in _pads.allValues)b.highlighted=NO;}
+- (BOOL)hasBundledGame{
+ return [NSFileManager.defaultManager fileExistsAtPath:[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"mod2/content.sealed"].path];
+}
 - (void)viewDidAppear:(BOOL)animated{[super viewDidAppear:animated];[self becomeFirstResponder];if(!_operation)[self resume];
  if([NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE"] isEqualToString:@"1"]){dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),dispatch_get_main_queue(),^{[self runSmoke];});}
+ else if(!_triedBundled&&[self hasBundledGame]){
+  _triedBundled=YES;
+  [self openBundledGame];
+ }
 }
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator{[self releaseButtons];_clock=0;[super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];[coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context){[self.view setNeedsLayout];} completion:nil];}
 - (void)cluster:(CGRect)area right:(BOOL)right {
@@ -229,7 +248,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  }
  BOOL rejected=corrupted.length>40&&![_quickSlots readState:path purpose:purpose error:nil];
  [NSFileManager.defaultManager removeItemAtPath:path error:nil];
- if(error)NSLog(@"Legend smoke slot: %@",error);
+ [self smokeProgress:[NSString stringWithFormat:@"slot written=%d restored=%d bound=%d rejected=%d %@",written,restored,bound,rejected,error.localizedDescription?:@""]];
  return restored&&bound&&rejected;
 }
 - (void)runSmoke{
@@ -314,7 +333,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  if(_autoEnabled.load()){[self stopAuto];return;}if(!_ready||_paused||_background||_operation||!_data){[self alert:@"Auto" text:@"Mở game được hỗ trợ trước khi bật Auto."];return;}
  auto data=_data;uint64_t ticket=_autoGeneration.fetch_add(1)+1;_autoEnabled.store(true);_logo.running=YES;[self releaseButtons];
  dispatch_async(_worker,^{if(ticket!=self->_autoGeneration.load()||!self->_autoEnabled.load())return;
-  if(!self->_core->compatibility.enabled){self->_autoEnabled.store(false);dispatch_async(dispatch_get_main_queue(),^{if(ticket==self->_autoGeneration.load()){self->_logo.running=NO;[self alert:@"Auto" text:@"Bản game này chưa được nhận diện để dùng Auto."];}});return;}
+  if(!self->_core->compatibility.enabled&&!self->_core->hasProtectedWallet()){self->_autoEnabled.store(false);dispatch_async(dispatch_get_main_queue(),^{if(ticket==self->_autoGeneration.load()){self->_logo.running=NO;[self alert:@"Auto" text:@"Bản game này chưa được nhận diện để dùng Auto."];}});return;}
   self->_autoData=data;self->_autoAdvisor=std::make_unique<Legend::FusionAdvisor>(*data,Legend::defaultCompatibility().handSignatures);self->_auto=std::make_unique<Legend::AutoPlayer>(*data,*self->_autoAdvisor);self->_autoFrame=0;
   if(ticket==self->_autoGeneration.load()&&self->_autoEnabled.load())self->_core->autoInput.store(0x10000);
  });
@@ -360,8 +379,11 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (void)alert:(NSString*)title text:(NSString*)text{UIAlertController* a=[UIAlertController alertControllerWithTitle:title message:text preferredStyle:UIAlertControllerStyleAlert];__weak LGPlayer* weak=self;[a addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[weak resumePlayback];}]];[self presentViewController:a animated:YES completion:nil];}
 - (void)menu {
  [self pause];UIAlertController* a=[UIAlertController alertControllerWithTitle:@"Yu-Gi-Oh! FM: Legend" message:nil preferredStyle:UIAlertControllerStyleActionSheet];__weak LGPlayer* weak=self;
- [a addAction:[UIAlertAction actionWithTitle:@"Mở game ISO / BIN / IMG" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak pick:NO];}]];
+ BOOL bundled=[self hasBundledGame];
+ [a addAction:[UIAlertAction actionWithTitle:bundled?@"Mở Mod 2":@"Mở game ISO / BIN / IMG"
+  style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){if(bundled)[weak openBundledGame];else [weak pick:NO];}]];
  [a addAction:[UIAlertAction actionWithTitle:@"VIP" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak vipMenu];}]];
+ [a addAction:[UIAlertAction actionWithTitle:@"Gacha" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak showGacha];}]];
  [a addAction:[UIAlertAction actionWithTitle:@"Cài Đặt" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak settings];}]];
  [a addAction:[UIAlertAction actionWithTitle:@"Tiếp tục" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[weak resumePlayback];}]];
  a.popoverPresentationController.sourceView=_menu;a.popoverPresentationController.sourceRect=_menu.bounds;[self presentViewController:a animated:YES completion:nil];
@@ -385,6 +407,92 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  picker.delegate=self;
  picker.allowsMultipleSelection=NO;
  [self presentViewController:picker animated:YES completion:nil];
+}
+- (void)openBundledGame{
+ if(_operation)return;
+ [self pause];
+ _operation=YES;
+ _menu.enabled=NO;
+ _placeholder.hidden=NO;
+ _placeholder.text=@"Đang mở Mod 2…";
+ NSUInteger generation=++_generation;
+ _lastRam.reset();
+ _data.reset();
+ _hasSelected=NO;
+ _duel={};
+ [self->_overlay showView:_duel row:nullptr];
+ dispatch_async(_worker,^{
+  NSString* failure=nil;
+  std::shared_ptr<Legend::GameData> catalog;
+  try{
+   [self persistCard];
+   NSURL* media=[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"mod2" isDirectory:YES];
+   NSData* key=[NSData dataWithContentsOfURL:[media URLByAppendingPathComponent:@"content.key"]];
+   auto* bytes=static_cast<const uint8_t*>(key.bytes);
+   NSString* discPath=[media URLByAppendingPathComponent:@"content.sealed"].path;
+   auto disc=Legend::openSealedDisc(discPath.UTF8String,bytes,key.length);
+   catalog=std::make_shared<Legend::GameData>(disc);
+   if(catalog->cardCount!=800)throw std::runtime_error("Dữ liệu Mod 2 không đúng phiên bản.");
+   NSString* identity=LGText(disc->identity());
+   NSData* manifest=[NSData dataWithContentsOfURL:[media URLByAppendingPathComponent:@"manifest.json"]];
+   id record=manifest?[NSJSONSerialization JSONObjectWithData:manifest options:0 error:nil]:nil;
+   NSDictionary* metadata=[record isKindOfClass:NSDictionary.class]?record:nil;
+   NSData* bios=[NSData dataWithContentsOfURL:[media URLByAppendingPathComponent:@"ps1.rom"]];
+   if(bios.length!=524288||![metadata[@"bios_sha256"] isEqual:Digest(bios)])
+    throw std::runtime_error("BIOS đi kèm không hợp lệ.");
+   NSFileManager* files=NSFileManager.defaultManager;
+   NSURL* support=[[files URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject
+    URLByAppendingPathComponent:@"LegendCore" isDirectory:YES];
+   NSURL* system=[support URLByAppendingPathComponent:@"system" isDirectory:YES];
+   NSURL* saves=[support URLByAppendingPathComponent:@"saves" isDirectory:YES];
+   NSError* error=nil;
+   BOOL ready=[files createDirectoryAtURL:system withIntermediateDirectories:YES attributes:nil error:&error]&&
+    [files createDirectoryAtURL:saves withIntermediateDirectories:YES attributes:nil error:&error]&&
+    [bios writeToURL:[system URLByAppendingPathComponent:@"scph1001.bin"] options:NSDataWritingAtomic error:&error];
+   if(!ready)throw std::runtime_error(error.localizedDescription.UTF8String?:"Không chuẩn bị được Mod 2.");
+   NSData* card=[self readCardForKey:identity error:&error];
+   if(error)throw std::runtime_error(error.localizedDescription.UTF8String?:"Không đọc được thẻ nhớ.");
+   std::string detail;
+   if(!self->_core->open(discPath.UTF8String,support.path.UTF8String,detail,std::move(disc)))
+    throw std::runtime_error(detail);
+   self->_gameKey=identity;
+   self->_needsNativeLoad=true;
+   self->_persistedCard.clear();
+   self->_core->setSpeed(self->_speed);
+   if(card){
+    const auto* saved=static_cast<const uint8_t*>(card.bytes);
+    if(!self->_core->setMemoryCard({saved,saved+card.length}))
+     throw std::runtime_error("Core không nhận được thẻ nhớ.");
+    if([files fileExistsAtPath:[self cardPathForKey:identity extension:@"sealed"]])
+     self->_persistedCard.assign(saved,saved+card.length);
+    else [self persistCard];
+   }
+  }catch(const std::exception& problem){
+   failure=LGText(problem.what());
+   catalog.reset();
+   self->_gameKey=nil;
+   self->_core->close();
+  }
+  double fps=self->_core->fps,rate=self->_core->sampleRate;
+  dispatch_async(self->_analysis,^{
+   self->_advisor.reset();
+   self->_analysisData=catalog;
+   if(catalog)self->_advisor=std::make_unique<Legend::FusionAdvisor>(*catalog,Legend::defaultCompatibility().handSignatures);
+   dispatch_async(dispatch_get_main_queue(),^{
+    if(generation!=self->_generation)return;
+    self->_operation=NO;
+    self->_menu.enabled=YES;
+    self->_data=catalog;
+    self->_ready=catalog!=nullptr;
+    self->_placeholder.hidden=self->_ready;
+    self->_fps=fps;self->_sampleRate=rate;
+    [self->_audioEngine stop];self->_audioEngine=nil;self->_audioSource=nil;self->_screen.image=nil;
+    [self.view setNeedsLayout];
+    if(failure){self->_placeholder.text=@"Mở Mod 2 từ menu";[self alert:@"Không mở được Mod 2" text:failure];}
+    else{[self preloadQuickSlot:self->_slot];[self resume];}
+   });
+  });
+ });
 }
 - (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller{_operation=NO;[self resumePlayback];}
 - (NSString*)importURL:(NSURL*)url bios:(BOOL)bios error:(NSError**)error {
@@ -416,6 +524,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
    if(!success&&!error)error=Failure(LGText(problem));
    if(success){
     self->_gameKey=key;
+    self->_needsNativeLoad=true;
     self->_persistedCard.clear();
     self->_core->setSpeed(self->_speed);
     if(card){
@@ -477,6 +586,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   *error=Failure(@"Thẻ nhớ không hợp lệ.");
   return NO;
  }
+ _core->checkWallet();
  if(card==_persistedCard)return YES;
  NSData* bytes=[NSData dataWithBytes:card.data() length:card.size()];
  NSData* sealed=[_vault seal:bytes purpose:[@"card/" stringByAppendingString:_gameKey] error:error];
@@ -484,6 +594,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  NSString* path=[self cardPathForKey:_gameKey extension:@"sealed"];
  if(![sealed writeToFile:path options:NSDataWritingAtomic error:error])return NO;
  _persistedCard=card;
+ _core->confirmMemoryCard(card);
  NSString* legacy=[self cardPathForKey:_gameKey extension:@"mcr"];
  NSFileManager* files=NSFileManager.defaultManager;
  if([files fileExistsAtPath:legacy]){
@@ -495,10 +606,34 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (NSString*)statePath:(NSInteger)slot{return [[_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_slot%02ld.state",_gameKey,(long)slot]];}
 - (void)persistCard{
  if(!_gameKey||!_core->isLoaded())return;
- auto bytes=_core->memoryCard();
- if(bytes.empty())return;
- NSError* error=nil;
- if(![self commitCard:bytes error:&error])NSLog(@"Legend card: %@",error);
+ try{
+  _core->checkWallet();
+  auto bytes=_core->memoryCard();
+  if(bytes.empty())return;
+  NSError* error=nil;
+  if(![self commitCard:bytes error:&error])NSLog(@"Legend card: %@",error);
+ }catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];}
+}
+- (void)rejectWallet:(NSString*)message{
+ _gameKey=nil;
+ _persistedCard.clear();
+ _fusionSelection.reset();
+ _core->close();
+ dispatch_async(dispatch_get_main_queue(),^{
+  ++self->_generation;
+  self->_ready=NO;
+  self->_operation=NO;
+  self->_inFlight=NO;
+  self->_analyzing=NO;
+  self->_lastRam.reset();
+  [self pause];
+  self->_screen.image=nil;
+  [self.view setNeedsLayout];
+  if(self.presentedViewController)[self dismissViewControllerAnimated:NO completion:^{
+   [self alert:@"Phiên game đã dừng" text:message];
+  }];
+  else [self alert:@"Phiên game đã dừng" text:message];
+ });
 }
 - (NSString*)sealedSlotPath:(NSInteger)slot{return [[[self statePath:slot] stringByDeletingPathExtension] stringByAppendingPathExtension:@"slot"];}
 - (NSString*)slotPurpose:(NSInteger)slot version:(NSString*)version{
@@ -551,12 +686,15 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  NSInteger slot=_slot;
  NSUInteger generation=_generation;
  dispatch_async(_worker,^{
+  try{self->_core->checkWallet();}
+  catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}
   auto state=self->_core->saveState();
   NSData* bytes=state.empty()?nil:[NSData dataWithBytes:state.data() length:state.size()];
   if(bytes){
    NSString* path=[self sealedSlotPath:slot];
    NSString* purpose=[self slotPurpose:slot version:LGText(self->_core->coreVersion())];
    [self persistCard];
+   if(!self->_core->isLoaded())return;
    dispatch_async(self->_slotIO,^{
     NSError* error=nil;
     BOOL ok=[self->_quickSlots writeState:bytes path:path purpose:purpose error:&error];
@@ -581,22 +719,26 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _operation=YES;
  NSInteger slot=_slot;
  dispatch_async(_worker,^{
+  try{self->_core->checkWallet();}
+  catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}
   NSString* path=[self sealedSlotPath:slot],*oldPath=[self statePath:slot];
   NSString* identity=self->_gameKey,*version=LGText(self->_core->coreVersion());
   NSString* purpose=[self slotPurpose:slot version:version];
+  BOOL allowLegacy=!self->_core->hasProtectedWallet();
   dispatch_async(self->_slotIO,^{
    NSError* error=nil;
    NSData* state=[NSFileManager.defaultManager fileExistsAtPath:path]?
     [self->_quickSlots readState:path purpose:purpose error:&error]:
-    [self legacySlot:oldPath key:identity version:version slot:slot];
+    (allowLegacy?[self legacySlot:oldPath key:identity version:version slot:slot]:nil);
    dispatch_async(self->_worker,^{
     BOOL ok=NO,fatal=NO;
-    if(state){
+    try{self->_core->checkWallet();if(state){
      auto checkpoint=self->_core->saveState();
      auto card=self->_core->memoryCard();
      const auto* bytes=static_cast<const uint8_t*>(state.bytes);
      if(!checkpoint.empty()&&card.size()==131072){
       ok=self->_core->loadState({bytes,bytes+state.length})&&self->_core->setMemoryCard(card);
+      if(ok)self->_needsNativeLoad=true;
       if(!ok){
        bool restored=self->_core->loadState(checkpoint);
        bool cardRestored=self->_core->setMemoryCard(card);
@@ -604,7 +746,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
        if(fatal){self->_gameKey=nil;self->_core->close();}
       }
      }
-    }
+    }}catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}
     dispatch_async(dispatch_get_main_queue(),^{
      self->_operation=NO;
      if(fatal)self->_ready=NO;
@@ -678,6 +820,86 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (void)tableView:(UITableView*)table didSelectRowAtIndexPath:(NSIndexPath*)path{[self selectFusion:path.row];}
 - (CGFloat)tableView:(UITableView*)table heightForRowAtIndexPath:(NSIndexPath*)path{UITableViewCell* cell=[self tableView:table cellForRowAtIndexPath:path];CGFloat width=MAX(30,table.bounds.size.width-44);return MAX(64,24+[cell.textLabel sizeThatFits:CGSizeMake(width,CGFLOAT_MAX)].height+[cell.detailTextLabel sizeThatFits:CGSizeMake(width,CGFLOAT_MAX)].height);}
 - (void)showVIP{[self pause];if(!_data){[self alert:@"VIP" text:@"Mở game có dữ liệu VIP trước. Nếu vừa mở, chờ đọc dữ liệu một lát."];return;}LGVipController* vip=[[LGVipController alloc]initWithData:_data queue:_analysis ram:_lastRam];__weak LGPlayer* weak=self;vip.closed=^{[weak resumePlayback];};[self presentViewController:vip animated:YES completion:nil];}
+- (void)showGacha{
+ [self pause];
+ if(!_ready||!_data||_data->cardCount!=800||_operation){
+  [self alert:@"Gacha" text:@"Hãy mở Mod 2 và LOAD trong game."];
+  return;
+ }
+ NSURL* media=[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"gacha" isDirectory:YES];
+ if(![NSFileManager.defaultManager fileExistsAtPath:[media URLByAppendingPathComponent:@"open.mp4"].path]){
+  [self alert:@"Gacha" text:@"Bản kiểm thử này chưa có tài nguyên Gacha."];
+  return;
+ }
+ auto game=_data;
+ auto generation=_generation;
+ dispatch_async(_worker,^{
+  NSInteger stars=-1;
+  NSString* message=nil;
+  try{
+   if(!self->_core->hasProtectedWallet())throw std::runtime_error("Hãy mở bản Mod 2 được hỗ trợ.");
+   self->_core->checkWallet();
+   auto ram=self->_core->ramSnapshot();
+   stars=Legend::Gacha::inspect(ram);
+   auto saved=Legend::Gacha::savedPayload(self->_core->memoryCard());
+   if(self->_needsNativeLoad&&!Legend::Gacha::walletMatches(saved,ram))
+    throw std::runtime_error("Hãy LOAD trong game trước khi mở Gacha.");
+   self->_needsNativeLoad=false;
+  }catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}
+  catch(const std::exception& failure){message=LGText(failure.what());}
+  dispatch_async(dispatch_get_main_queue(),^{
+   if(generation!=self->_generation||self->_background)return;
+   if(message){[self alert:@"Gacha" text:message];return;}
+   LGGachaController* scene=[[LGGachaController alloc]initWithData:game stars:stars media:media queue:self->_analysis];
+   __weak LGPlayer* weak=self;
+   scene.closed=^{[weak resumePlayback];};
+   scene.openPacks=^(NSInteger quantity,NSInteger quote,void(^reply)(NSInteger,NSArray<NSNumber*>*,NSString*)){
+    [weak gachaAction:quantity quoted:quote code:nil reply:reply];
+   };
+   scene.gift=^(NSString* code,void(^reply)(NSInteger,NSString*)){
+    [weak gachaAction:0 quoted:0 code:code reply:^(NSInteger stars,NSArray<NSNumber*>* cards,NSString* error){reply(stars,error);}];
+   };
+   [self presentViewController:scene animated:YES completion:nil];
+  });
+ });
+}
+- (void)gachaAction:(NSInteger)quantity quoted:(NSInteger)quote code:(NSString*)code
+              reply:(void(^)(NSInteger,NSArray<NSNumber*>*,NSString*))reply{
+ if(!_ready||_operation||_background){reply(-1,nil,@"Game đang chuyển màn hình.");return;}
+ _operation=YES;
+ _transactionCancelled.store(false);
+ dispatch_async(_worker,^{
+  NSString* message=nil;
+  NSInteger stars=-1;
+  NSMutableArray<NSNumber*>* cards=[NSMutableArray array];
+  try{
+   self->_core->checkWallet();
+   if(!self->_core->hasProtectedWallet())throw std::runtime_error("Hãy mở bản Mod 2 được hỗ trợ.");
+   Legend::CoreTransaction transaction(*self->_core,self->_transactionCancelled,[self](const Legend::Bytes& card){
+    NSError* error=nil;
+    if(![self commitCard:card error:&error])
+     throw std::runtime_error(error.localizedDescription.UTF8String?:"Không ghi được SAVE.");
+   });
+   if(quantity){
+    auto result=Legend::Gacha::draw(transaction,int(quantity),int(quote),self->_needsNativeLoad);
+    stars=result.stars;
+    for(int id:result.cards)[cards addObject:@(id)];
+   }else{
+    if(!self->_giftCodes)throw std::runtime_error("Khóa xác thực mã quà chưa sẵn sàng.");
+    NSError* error=nil;
+    stars=[self->_giftCodes redeem:code game:transaction requireNativeLoad:self->_needsNativeLoad error:&error];
+    if(stars<0)message=error.localizedDescription?:@"Không đổi được mã quà.";
+   }
+   if(!message)self->_needsNativeLoad=false;
+  }catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}
+  catch(const Legend::RollbackFailed& failure){[self rejectWallet:LGText(failure.what())];return;}
+  catch(const std::exception& failure){message=LGText(failure.what());}
+  dispatch_async(dispatch_get_main_queue(),^{
+   self->_operation=NO;
+   reply(stars,cards,message);
+  });
+ });
+}
 - (void)showCollection{
  [self pause];
  if(!_ready||!_data||_operation){
@@ -723,6 +945,9 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   try{
    Legend::CoreTransaction transaction(*self->_core,self->_transactionCancelled);
    Legend::applyDeck(transaction,inventory,cards);
+  }catch(const Legend::WalletRejected& problem){
+   [self rejectWallet:LGText(problem.what())];
+   return;
   }catch(const Legend::RollbackFailed& problem){
    self->_gameKey=nil;
    self->_core->close();
@@ -739,7 +964,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  });
 }
 - (LGSettingsController*)configuredSettings{
- LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;__weak LGPlayer* weak=self;
+ LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;settings.bundledGame=[self hasBundledGame];__weak LGPlayer* weak=self;
  settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;BOOL slotChanged=owner->_slot!=s.slot;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];if(slotChanged)[owner preloadQuickSlot:s.slot];[owner.view setNeedsLayout];};
  settings.closed=^{[weak resumePlayback];};settings.command=^(NSString* command){[weak command:command];};return settings;
 }
@@ -749,17 +974,17 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (void)command:(NSString*)command{
  if([command isEqualToString:@"bios"]){[self pick:YES];return;}if([command isEqualToString:@"license"]){NSString* path=[NSBundle.mainBundle pathForResource:@"LICENSES" ofType:@"txt"];NSString* text=[NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil]?:@"SwanStation — GPLv3\nMã nguồn: https://github.com/xuyendem249-cloud/Mod_LOGs";UIViewController* vc=[[UIViewController alloc]init];vc.title=@"Mã nguồn & giấy phép";UITextView* view=[[UITextView alloc]init];view.text=text;view.editable=NO;view.backgroundColor=Ink();view.textColor=UIColor.whiteColor;view.font=[UIFont systemFontOfSize:13];vc.view=view;vc.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(closeDocument)];UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:vc];nav.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:nav animated:YES completion:nil];return;}
  if(!_ready){[self alert:@"Chưa mở game" text:@"Hãy mở đúng game trước."];return;}
- if([command isEqualToString:@"reset"])[self confirm:@"Khởi động lại game?" text:@"Thẻ nhớ được lưu trước khi khởi động lại. Tiến trình chưa lưu trong game sẽ mất." action:^{++self->_generation;self->_lastRam.reset();self->_operation=YES;dispatch_async(self->_worker,^{[self persistCard];self->_core->reset();dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;self->_duel={};self->_hasSelected=NO;[self->_overlay showView:self->_duel row:nullptr];[self resumePlayback];});});}];
+ if([command isEqualToString:@"reset"])[self confirm:@"Khởi động lại game?" text:@"Thẻ nhớ được lưu trước khi khởi động lại. Tiến trình chưa lưu trong game sẽ mất." action:^{++self->_generation;self->_lastRam.reset();self->_operation=YES;dispatch_async(self->_worker,^{[self persistCard];try{self->_core->reset();self->_needsNativeLoad=true;}catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;self->_duel={};self->_hasSelected=NO;[self->_overlay showView:self->_duel row:nullptr];[self resumePlayback];});});}];
 }
 - (void)closeDocument{[self dismissViewControllerAnimated:YES completion:^{[self resumePlayback];}];}
 - (void)confirm:(NSString*)title text:(NSString*)text action:(void(^)(void))callback{UIAlertController* a=[UIAlertController alertControllerWithTitle:title message:text preferredStyle:UIAlertControllerStyleAlert];[a addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[self resumePlayback];}]];[a addAction:[UIAlertAction actionWithTitle:@"Tiếp tục" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){callback();}]];[self presentViewController:a animated:YES completion:nil];}
 - (void)tick:(CADisplayLink*)link {
  if(!_ready||_paused||_background||_inFlight)return;double now=link.timestamp;if(!_clock)_clock=now-1.0/_fps;double elapsed=std::clamp(now-_clock,0.,.1);_clock=now;_frameDebt+=elapsed*_fps*_speed;int count=MIN(8,int(_frameDebt));if(count<1)return;_frameDebt-=count;_inFlight=YES;NSUInteger generation=_generation;BOOL snapshot=!_analyzing&&now-_lastSnapshot>=.15;if(snapshot){_analyzing=YES;_lastSnapshot=now;}
- dispatch_async(_worker,^{BOOL changed=NO;for(int i=0;i<count;i++){
+ dispatch_async(_worker,^{BOOL changed=NO;try{for(int i=0;i<count;i++){
  if(![self stepFusion]&&self->_autoEnabled.load()&&self->_auto){uint64_t ticket=self->_autoGeneration.load();Legend::Bytes ram;const Legend::Bytes* snapshot=nullptr;if(self->_autoFrame>=self->_auto->nextDecision&&self->_autoFrame>=self->_auto->releaseAt){ram=self->_core->ramSnapshot();snapshot=&ram;}int mask=self->_auto->next(snapshot,self->_autoFrame++);
   if(ticket==self->_autoGeneration.load()&&self->_autoEnabled.load()){self->_core->setAutoMask(mask);if(self->_auto->stopped){self->_autoEnabled.store(false);self->_core->autoInput.store(0);dispatch_async(dispatch_get_main_queue(),^{if(ticket==self->_autoGeneration.load()){self->_logo.running=NO;UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,@"Auto đã tắt");}});}}
  }
- changed=self->_core->run()||changed;}UIImage* image=nil;if(changed){auto& f=self->_core->frame;NSData* bytes=[NSData dataWithBytes:f.rgba.data() length:f.rgba.size()];CGDataProviderRef provider=CGDataProviderCreateWithCFData((__bridge CFDataRef)bytes);CGColorSpaceRef space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);CGImageRef cg=CGImageCreate(f.width,f.height,8,32,f.width*4,space,kCGImageAlphaLast|kCGBitmapByteOrder32Big,provider,NULL,NO,kCGRenderingIntentDefault);if(cg){image=[UIImage imageWithCGImage:cg];CGImageRelease(cg);}CGColorSpaceRelease(space);CGDataProviderRelease(provider);}
+ changed=self->_core->run()||changed;}}catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}UIImage* image=nil;if(changed){auto& f=self->_core->frame;NSData* bytes=[NSData dataWithBytes:f.rgba.data() length:f.rgba.size()];CGDataProviderRef provider=CGDataProviderCreateWithCFData((__bridge CFDataRef)bytes);CGColorSpaceRef space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);CGImageRef cg=CGImageCreate(f.width,f.height,8,32,f.width*4,space,kCGImageAlphaLast|kCGBitmapByteOrder32Big,provider,NULL,NO,kCGRenderingIntentDefault);if(cg){image=[UIImage imageWithCGImage:cg];CGImageRelease(cg);}CGColorSpaceRelease(space);CGDataProviderRelease(provider);}
   if(now-self->_lastCardFlush>=10){[self persistCard];self->_lastCardFlush=now;}
   if(snapshot){auto ram=std::make_shared<Legend::Bytes>(self->_core->ramSnapshot());dispatch_async(self->_analysis,^{Legend::DuelView view;try{if(self->_advisor)view=self->_advisor->analyze(*ram);}catch(const std::exception& e){NSLog(@"Legend Fusion: %s",e.what());}dispatch_async(dispatch_get_main_queue(),^{self->_analyzing=NO;if(generation==self->_generation){self->_lastRam=ram;[self advice:view];}});});}
   dispatch_async(dispatch_get_main_queue(),^{if(generation==self->_generation&&image)self->_screen.image=image;self->_inFlight=NO;});

@@ -7,12 +7,13 @@ namespace Legend {
 struct RollbackFailed : std::runtime_error {
  using std::runtime_error::runtime_error;
 };
-class CoreTransaction final : public GameTransaction {
+class CoreTransaction final : public GachaTransaction {
  PlayerCore& core;
  const std::atomic<bool>& cancelled;
+ Gacha::Journal cardWriter;
 public:
- CoreTransaction(PlayerCore& engine,const std::atomic<bool>& cancellation)
-  :core(engine),cancelled(cancellation){}
+ CoreTransaction(PlayerCore& engine,const std::atomic<bool>& cancellation,Gacha::Journal writer={})
+  :core(engine),cancelled(cancellation),cardWriter(std::move(writer)){}
  Bytes ram()override{return core.ramSnapshot();}
  uint8_t readByte(size_t offset)override{return core.readRamByte(offset);}
  Bytes card()override{return core.memoryCard();}
@@ -28,5 +29,10 @@ public:
   if(!loaded||!restored)throw RollbackFailed("Không khôi phục được phiên game. Hãy mở lại game.");
  }
  bool interrupted()const override{return cancelled.load();}
+ void setStars(int stars)override{core.setStarsFromTransaction(stars);}
+ void commitCard(const Bytes& card)override{
+  if(!cardWriter)throw std::runtime_error("Kho SAVE chưa sẵn sàng.");
+  cardWriter(card);
+ }
 };
 }

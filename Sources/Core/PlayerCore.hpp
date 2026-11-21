@@ -2,6 +2,7 @@
 #include "FrameAndInput.hpp"
 #include "AudioRing.hpp"
 #include "ModCompatibility.hpp"
+#include "WalletGuard.hpp"
 #include "libretro.h"
 #include <string>
 #include <map>
@@ -16,6 +17,10 @@ class PlayerCore {
   std::string systemPath,savePath,contentPath,gamePath,lastMessage;
   std::map<std::string,std::string> options;
   double audioPosition=0,speed=1;
+  bool protectedWallet=false;
+  WalletGuard wallet;
+  Bytes verifiedCard;
+  WalletSignal signal()const;
   static bool environment(unsigned,void*);
   static void video(const void*,unsigned,unsigned,size_t);
   static void sample(int16_t,int16_t);
@@ -33,7 +38,8 @@ public:
   double fps=59.94,sampleRate=44100;
   PlayerCore();
   ~PlayerCore();
-  bool open(const std::string& path,const std::string& root,std::string& error);
+  bool open(const std::string& path,const std::string& root,std::string& error,
+            std::shared_ptr<DiscStream> disc={});
   bool run();
   void close();
   std::vector<uint8_t> saveState();
@@ -44,6 +50,10 @@ public:
   uint8_t readRamByte(size_t offset);
   void writeRam(size_t offset,const std::vector<uint8_t>& bytes);
   void runTransactionFrames(unsigned count,uint16_t mask);
+  void checkWallet();
+  void setStarsFromTransaction(int stars);
+  void confirmMemoryCard(const Bytes& card);
+  bool hasProtectedWallet()const{return protectedWallet;}
   void reset();
   void setSpeed(double value){speed=value>=1&&value<=4?value:1;audioPosition=0;audio.clear();}
   double playbackRate()const{return speed;}

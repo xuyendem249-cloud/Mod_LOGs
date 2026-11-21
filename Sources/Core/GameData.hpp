@@ -2,12 +2,14 @@
 #include <array>
 #include <cstdint>
 #include <fstream>
+#include <memory>
 #include <map>
 #include <mutex>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "DiscStream.hpp"
 namespace Legend {
 using Bytes=std::vector<uint8_t>;
 inline unsigned u16(const Bytes& b,size_t p){return p<=b.size()&&b.size()-p>=2?b[p]|unsigned(b[p+1])<<8:0;}
@@ -16,10 +18,12 @@ using FusionMap=std::map<int,int>;
 using EquipMap=std::map<int,std::set<int>>;
 class GameData {
  std::ifstream file;uint64_t fileSize=0;int sector=2048,skip=0;std::mutex mutex;
+ std::shared_ptr<DiscStream> stream;
  std::map<std::string,std::pair<unsigned,unsigned>> files;std::map<int,std::array<int,2>> overrides;
  unsigned wa=0;std::array<Bytes,40> photos;std::array<FusionMap,7> fusionMaps;std::array<bool,7> fusionReady{};
  uint64_t extraArt=0;
  std::map<int,std::vector<uint32_t>> artCache;
+ void parse();
  void walk(const std::string&,unsigned,unsigned,int);
  std::string glyph(unsigned)const;std::string name(int)const;
  std::string rawScript(uint32_t,std::vector<uint32_t>)const;
@@ -42,6 +46,7 @@ public:
  std::array<std::vector<uint32_t>,41> icons;
  std::array<std::vector<uint32_t>,9> attributeIcons;
  explicit GameData(const std::string& path);
+ explicit GameData(std::shared_ptr<DiscStream> source);
  Bytes read(unsigned lba,size_t length,uint64_t offset=0);
  uint32_t word(uint32_t at)const{return u32(slus,uint32_t(at-bias));}
  Bytes block(uint32_t at,size_t length)const;

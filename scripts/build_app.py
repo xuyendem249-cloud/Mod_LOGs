@@ -10,9 +10,9 @@ def main(sdk):
  clang=capture(['xcrun','--sdk',sdk,'--find','clang++'])
  folder=ROOT/'build'/sdk;app=folder/'Legend.app';app.mkdir(exist_ok=True)
  target='arm64-apple-ios17.0'+('-simulator' if sdk=='iphonesimulator' else '')
- app_sources=('main.mm','LegendViews.mm','LegendSaveVault.mm')
+ app_sources=('main.mm','LegendViews.mm','LegendSaveVault.mm','LegendGiftCodes.mm','LegendGachaView.mm','SealedDisc.mm')
  core_sources=('PlayerCore.cpp','Digest.cpp','GameData.cpp','FusionAdvisor.cpp','CollectionSnapshot.cpp',
-               'DeckPlanner.cpp','DeckTransfer.cpp','Gacha.cpp')
+               'DeckPlanner.cpp','DeckTransfer.cpp','Gacha.cpp','WalletGuard.cpp','BundledDiscVfs.cpp')
  sources=[*(ROOT/'Sources/App'/name for name in app_sources),*(ROOT/'Sources/Core'/name for name in core_sources)]
  args=[clang,'-target',target,'-isysroot',sdkroot,'-std=c++17','-fobjc-arc','-fblocks','-O2','-g','-Wall','-Wextra','-Wno-unused-parameter','-Wno-deprecated-declarations','-I'+str(ROOT/'Sources/Core'),'-I'+str(ROOT/'vendor/swanstation/dep/libretro-common/include'),*sources,folder/'LegendSwanStation.a','-o',app/'Legend']
  # The direct clang build does not enable Clang module autolinking. Link the
@@ -30,7 +30,11 @@ def main(sdk):
  run(['xcrun','actool',catalog,'--compile',app,'--platform',sdk,'--minimum-deployment-target','17.0','--target-device','iphone','--target-device','ipad','--app-icon','AppIcon','--output-partial-info-plist',partial,'--output-format','human-readable-text'])
  info.update(plistlib.loads(partial.read_bytes()));(app/'Info.plist').write_bytes(plistlib.dumps(info))
  # Simulator ad-hoc signing needs no Apple identity. Device output is intentionally unsigned.
- if sdk=='iphonesimulator':run(['codesign','--force','--sign','-',app])
+ if sdk=='iphonesimulator':
+  identifier='SIMULATOR0.'+info['CFBundleIdentifier']
+  entitlements=folder/'simulator-entitlements.plist'
+  entitlements.write_bytes(plistlib.dumps({'application-identifier':identifier,'keychain-access-groups':[identifier]}))
+  run(['codesign','--force','--sign','-','--entitlements',entitlements,app])
  report={'stage':3,'app_version':info['CFBundleShortVersionString'],'app_build':info['CFBundleVersion'],'sdk':sdk,'target':target,'apple_sdk_app_compiled':True,'signed_for_device':False,'installable_on_iphone':False,'testflight_uploaded':False,'game_or_bios_tested':False,'executable_sha256':hashlib.sha256((app/'Legend').read_bytes()).hexdigest()}
  archive=folder/('Legend-Step2-'+sdk+'-unsigned-app.zip')
  with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:

@@ -47,14 +47,28 @@ std::string clean(std::string s,bool singleLine=false){std::string out;bool spac
 }
 Bytes GameData::read(unsigned lba,size_t length,uint64_t offset){
  std::lock_guard<std::mutex> lock(mutex);if(length>8*1024*1024)throw std::runtime_error("Vùng dữ liệu ISO quá lớn");Bytes out(length);size_t copied=0;uint64_t start=lba+offset/2048;size_t within=offset%2048;
- while(copied<length){size_t n=std::min<size_t>(2048-within,length-copied);uint64_t at=start*sector+skip+within;if(at>fileSize||n>fileSize-at)throw std::runtime_error("ISO bị thiếu dữ liệu");file.clear();file.seekg(std::streamoff(at));file.read(reinterpret_cast<char*>(out.data()+copied),std::streamsize(n));if(!file)throw std::runtime_error("Không đọc được ISO");copied+=n;start++;within=0;}return out;
+ while(copied<length){size_t n=std::min<size_t>(2048-within,length-copied);uint64_t at=start*sector+skip+within;if(at>fileSize||n>fileSize-at)throw std::runtime_error("ISO bị thiếu dữ liệu");
+  if(stream)stream->readAt(at,out.data()+copied,n);
+  else{file.clear();file.seekg(std::streamoff(at));file.read(reinterpret_cast<char*>(out.data()+copied),std::streamsize(n));if(!file)throw std::runtime_error("Không đọc được ISO");}
+  copied+=n;start++;within=0;
+ }return out;
 }
 void GameData::walk(const std::string& prefix,unsigned lba,unsigned size,int depth){
  if(depth>8||files.size()>4096)throw std::runtime_error("Thư mục ISO không hợp lệ");Bytes b=read(lba,size);
  for(size_t p=0;p<b.size();){unsigned n=b[p];if(!n){p=(p/2048+1)*2048;continue;}if(n<34||p+n>b.size()||p+33+b[p+32]>p+n)throw std::runtime_error("Thư mục ISO bị lỗi");unsigned len=b[p+32];if(len==1&&b[p+33]<=1){p+=n;continue;}std::string title(reinterpret_cast<char*>(b.data()+p+33),len);title=title.substr(0,title.find(';'));std::transform(title.begin(),title.end(),title.begin(),[](unsigned char c){return char(std::toupper(c));});unsigned at=u32(b,p+2),length=u32(b,p+10);if(b[p+25]&2)walk(prefix+title+"/",at,length,depth+1);else files[prefix+title]={at,length};p+=n;}
 }
 GameData::GameData(const std::string& path):file(path,std::ios::binary){
- if(!file)throw std::runtime_error("Không mở được ISO");file.seekg(0,std::ios::end);fileSize=uint64_t(file.tellg());bool found=false;
+ if(!file)throw std::runtime_error("Không mở được ISO");
+ file.seekg(0,std::ios::end);fileSize=uint64_t(file.tellg());
+ parse();
+}
+GameData::GameData(std::shared_ptr<DiscStream> source):stream(std::move(source)){
+ if(!stream)throw std::runtime_error("Không mở được Mod 2");
+ fileSize=stream->size();
+ parse();
+}
+void GameData::parse(){
+ bool found=false;
  for(auto layout:{std::pair<int,int>{2048,0},{2352,24},{2352,16}}){sector=layout.first;skip=layout.second;try{auto v=read(16,2048);if(v[0]==1&&std::string(reinterpret_cast<char*>(v.data()+1),5)=="CD001"){found=true;break;}}catch(const std::exception&){} }
  if(!found)throw std::runtime_error("VIP cần ISO/BIN có dữ liệu ISO9660");auto pvd=read(16,2048);walk("",u32(pvd,158),u32(pvd,166),0);
  std::pair<unsigned,unsigned> exe{};for(const auto& e:files)if(e.first.rfind("SLUS_",0)==0)exe=e.second;

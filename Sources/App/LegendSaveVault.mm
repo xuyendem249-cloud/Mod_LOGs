@@ -66,7 +66,7 @@ void authenticate(const uint8_t* key,NSData* purpose,const void* encoded,size_t 
   }
   id object=CFBridgingRelease(returned);
   if(status!=errSecSuccess||![object isKindOfClass:NSData.class]||[(NSData*)object length]!=keySize*2){
-   setError(error,@"Không mở được khóa SAVE trên thiết bị này.");
+   setError(error,[NSString stringWithFormat:@"Không mở được khóa SAVE trên thiết bị này (%d).",status]);
    return nil;
   }
   _keys=object;

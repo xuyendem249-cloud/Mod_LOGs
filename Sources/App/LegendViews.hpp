@@ -34,6 +34,7 @@ NSAttributedString* LGDescription(Legend::GameData&,int);
 @end
 @interface LGSettingsController:UITableViewController
 @property(nonatomic) NSInteger fusionMode,slot;
+@property(nonatomic) BOOL bundledGame;
 @property(nonatomic) double speed;
 @property(nonatomic) float volume;
 @property(nonatomic,copy) void(^changed)(LGSettingsController*);

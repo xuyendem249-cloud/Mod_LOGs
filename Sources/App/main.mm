@@ -116,6 +116,9 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  BOOL _muted,_controllerEnabled;
  BOOL _triedBundled;
  bool _needsNativeLoad;
+ std::atomic<int> _imageFilter;
+ int _renderedFilter;
+ std::vector<uint8_t> _filteredPixels;
  LGFusionOverlay* _overlay;
  UITableView* _guide;
  LGDirectionPad* _dpad;
@@ -140,6 +143,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _slotIO=dispatch_queue_create("vn.anhchugia35.legend.slots",DISPATCH_QUEUE_SERIAL);
  _vault=[[LGSaveVault alloc]init];_quickSlots=[[LGQuickSlots alloc]initWithVault:_vault];
  NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
+ _imageFilter.store(int(std::clamp<NSInteger>([prefs integerForKey:@"filter_mode"],0,2)));
+ _renderedFilter=-1;
  _controllerEnabled=[prefs objectForKey:@"gamepad_enabled"]?[prefs boolForKey:@"gamepad_enabled"]:YES;
  NSString* docs=NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES).firstObject;_root=[docs stringByAppendingPathComponent:@"Legend"];
  for(NSString* name in @[@"system",@"saves",@"content"]) [[NSFileManager defaultManager] createDirectoryAtPath:[_root stringByAppendingPathComponent:name] withIntermediateDirectories:YES attributes:nil error:nil];
@@ -151,7 +156,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _bezel=[[UIView alloc]init];_bezel.backgroundColor=[UIColor colorWithWhite:.02 alpha:1];
  _bezel.layer.borderColor=[Gold() colorWithAlphaComponent:.65].CGColor;_bezel.layer.borderWidth=1;
  _bezel.userInteractionEnabled=NO;[self.view addSubview:_bezel];
- _screen=[[UIImageView alloc]init];_screen.backgroundColor=UIColor.blackColor;_screen.contentMode=UIViewContentModeScaleToFill;_screen.layer.magnificationFilter=kCAFilterNearest;_screen.clipsToBounds=YES;[self.view addSubview:_screen];
+ _screen=[[UIImageView alloc]init];_screen.backgroundColor=UIColor.blackColor;_screen.contentMode=UIViewContentModeScaleToFill;_screen.clipsToBounds=YES;[self.view addSubview:_screen];
+ [self setImageFilter:_imageFilter.load()];
  _placeholder=[[UILabel alloc]init];_placeholder.text=@"Mở menu để nhập BIOS và chọn game";_placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
  _welcome=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"welcome.png"]];_welcome.contentMode=UIViewContentModeScaleAspectFit;[_screen addSubview:_welcome];
  _overlay=[[LGFusionOverlay alloc]init];[_screen addSubview:_overlay];
@@ -964,9 +970,33 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  });
 }
 - (LGSettingsController*)configuredSettings{
- LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;settings.bundledGame=[self hasBundledGame];__weak LGPlayer* weak=self;
- settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;BOOL slotChanged=owner->_slot!=s.slot;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];if(slotChanged)[owner preloadQuickSlot:s.slot];[owner.view setNeedsLayout];};
+ LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;settings.bundledGame=[self hasBundledGame];settings.imageFilter=_imageFilter.load();__weak LGPlayer* weak=self;
+ settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;BOOL slotChanged=owner->_slot!=s.slot;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];[owner setImageFilter:int(s.imageFilter)];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];if(slotChanged)[owner preloadQuickSlot:s.slot];[owner.view setNeedsLayout];};
  settings.closed=^{[weak resumePlayback];};settings.command=^(NSString* command){[weak command:command];};return settings;
+}
+- (void)setImageFilter:(int)mode{
+ _imageFilter.store(mode);
+ _screen.layer.magnificationFilter=mode?kCAFilterLinear:kCAFilterNearest;
+ _screen.layer.minificationFilter=mode?kCAFilterLinear:kCAFilterNearest;
+ [NSUserDefaults.standardUserDefaults setInteger:mode forKey:@"filter_mode"];
+}
+- (UIImage*)frameImageIfChanged:(BOOL)changed{
+ auto& frame=_core->frame;
+ int mode=_imageFilter.load();
+ if(frame.rgba.empty()||(!changed&&mode==_renderedFilter))return nil;
+ _renderedFilter=mode;
+ if(mode)frame.sharpen(_filteredPixels,mode);
+ const auto& pixels=mode?_filteredPixels:frame.rgba;
+ NSData* bytes=[NSData dataWithBytes:pixels.data() length:pixels.size()];
+ CGDataProviderRef provider=CGDataProviderCreateWithCFData((__bridge CFDataRef)bytes);
+ CGColorSpaceRef space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+ CGImageRef cg=CGImageCreate(frame.width,frame.height,8,32,frame.width*4,space,
+  kCGImageAlphaLast|kCGBitmapByteOrder32Big,provider,NULL,NO,kCGRenderingIntentDefault);
+ UIImage* image=cg?[UIImage imageWithCGImage:cg]:nil;
+ if(cg)CGImageRelease(cg);
+ CGColorSpaceRelease(space);
+ CGDataProviderRelease(provider);
+ return image;
 }
 - (void)settings{
  [self pause];LGSettingsController* settings=[self configuredSettings];UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:settings];nav.overrideUserInterfaceStyle=UIUserInterfaceStyleDark;nav.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:nav animated:YES completion:nil];
@@ -984,7 +1014,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  if(![self stepFusion]&&self->_autoEnabled.load()&&self->_auto){uint64_t ticket=self->_autoGeneration.load();Legend::Bytes ram;const Legend::Bytes* snapshot=nullptr;if(self->_autoFrame>=self->_auto->nextDecision&&self->_autoFrame>=self->_auto->releaseAt){ram=self->_core->ramSnapshot();snapshot=&ram;}int mask=self->_auto->next(snapshot,self->_autoFrame++);
   if(ticket==self->_autoGeneration.load()&&self->_autoEnabled.load()){self->_core->setAutoMask(mask);if(self->_auto->stopped){self->_autoEnabled.store(false);self->_core->autoInput.store(0);dispatch_async(dispatch_get_main_queue(),^{if(ticket==self->_autoGeneration.load()){self->_logo.running=NO;UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,@"Auto đã tắt");}});}}
  }
- changed=self->_core->run()||changed;}}catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}UIImage* image=nil;if(changed){auto& f=self->_core->frame;NSData* bytes=[NSData dataWithBytes:f.rgba.data() length:f.rgba.size()];CGDataProviderRef provider=CGDataProviderCreateWithCFData((__bridge CFDataRef)bytes);CGColorSpaceRef space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);CGImageRef cg=CGImageCreate(f.width,f.height,8,32,f.width*4,space,kCGImageAlphaLast|kCGBitmapByteOrder32Big,provider,NULL,NO,kCGRenderingIntentDefault);if(cg){image=[UIImage imageWithCGImage:cg];CGImageRelease(cg);}CGColorSpaceRelease(space);CGDataProviderRelease(provider);}
+ changed=self->_core->run()||changed;}}catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}
+  UIImage* image=[self frameImageIfChanged:changed];
   if(now-self->_lastCardFlush>=10){[self persistCard];self->_lastCardFlush=now;}
   if(snapshot){auto ram=std::make_shared<Legend::Bytes>(self->_core->ramSnapshot());dispatch_async(self->_analysis,^{Legend::DuelView view;try{if(self->_advisor)view=self->_advisor->analyze(*ram);}catch(const std::exception& e){NSLog(@"Legend Fusion: %s",e.what());}dispatch_async(dispatch_get_main_queue(),^{self->_analyzing=NO;if(generation==self->_generation){self->_lastRam=ram;[self advice:view];}});});}
   dispatch_async(dispatch_get_main_queue(),^{if(generation==self->_generation&&image)self->_screen.image=image;self->_inFlight=NO;});

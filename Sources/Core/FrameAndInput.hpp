@@ -1,5 +1,6 @@
 // Legend frontend primitives. Pixels are explicit RGBA bytes, never raw ARGB memcpy.
 #pragma once
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -27,6 +28,19 @@ struct Frame {
       auto* out=rgba.data()+(size_t(y)*w+x)*4;out[0]=r;out[1]=g;out[2]=b;out[3]=255;
     }
     width=w;height=h;return true;
+  }
+  void sharpen(std::vector<uint8_t>& output,int strength) const {
+    output=rgba;
+    const size_t stride=size_t(width)*4;
+    for(unsigned y=1;y+1<height;y++)for(unsigned x=1;x+1<width;x++){
+      size_t at=y*stride+x*4;
+      for(size_t c=0;c<3;c++){
+        size_t i=at+c;
+        int value=rgba[i];
+        int difference=4*value-rgba[i-4]-rgba[i+4]-rgba[i-stride]-rgba[i+stride];
+        output[i]=uint8_t(std::clamp(value+strength*difference/8,0,255));
+      }
+    }
   }
 };
 class Input {

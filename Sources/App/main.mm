@@ -190,7 +190,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _analysis=dispatch_queue_create("vn.anhchugia35.legend.analysis",DISPATCH_QUEUE_SERIAL);
  _slotIO=dispatch_queue_create("vn.anhchugia35.legend.slots",DISPATCH_QUEUE_SERIAL);
  _vault=[[LGSaveVault alloc]init];_quickSlots=[[LGQuickSlots alloc]initWithVault:_vault];
- _padFeedback=[[UIImpactFeedbackGenerator alloc]initWithStyle:UIImpactFeedbackStyleLight];
+ _padFeedback=[[UIImpactFeedbackGenerator alloc]initWithStyle:UIImpactFeedbackStyleHeavy];
  NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
  _imageFilter.store(int(std::clamp<NSInteger>([prefs integerForKey:@"filter_mode"],0,2)));
  _renderedFilter=-1;

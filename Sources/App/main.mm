@@ -7,6 +7,7 @@
 #include <memory>
 #include <cmath>
 #import "LegendViews.hpp"
+#import "LegendSaveVault.h"
 #import <GameController/GameController.h>
 #include "CompatibilityTables.hpp"
 #include "ControllerGeometry.hpp"
@@ -63,6 +64,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 @interface LGPlayer:UIViewController<UIDocumentPickerDelegate,UITableViewDataSource,UITableViewDelegate> {
  std::unique_ptr<Legend::PlayerCore> _core;
  dispatch_queue_t _worker;
+ dispatch_queue_t _slotIO;
  BOOL _inFlight,_ready,_paused,_background,_pickingBIOS,_operation;
  double _fps,_sampleRate,_clock;
  NSString* _root;
@@ -87,6 +89,9 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  std::unique_ptr<Legend::FusionSelection> _fusionSelection;
  uint64_t _fusionTicket,_fusionFrame;
  UILabel* _placeholder;
+ UILabel* _quickNotice;
+ LGSaveVault* _vault;
+ LGQuickSlots* _quickSlots;
  UIButton* _menu;
  UIButton* _save;
  UIButton* _load;
@@ -99,8 +104,9 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  Legend::FusionRow _selected;
  BOOL _hasSelected,_analyzing;
  dispatch_queue_t _analysis;
- NSInteger _fusionMode,_slot,_pickMode;
+ NSInteger _fusionMode,_slot;
  NSUInteger _generation;
+ NSUInteger _quickNoticeRevision;
  double _speed,_boostSpeed,_frameDebt,_lastSnapshot,_lastCardFlush;
  float _volume;
  BOOL _muted,_controllerEnabled;
@@ -109,6 +115,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  LGDirectionPad* _dpad;
  uint16_t _sources[3],_combined;
  UIImageView* _welcome;
+ Legend::Bytes _persistedCard;
 
 }
 @end
@@ -123,6 +130,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  UIApplication.sharedApplication.idleTimerDisabled=YES;
  _core=std::make_unique<Legend::PlayerCore>();_worker=dispatch_queue_create("vn.anhchugia35.legend.core",DISPATCH_QUEUE_SERIAL);_fps=59.94;_sampleRate=44100;
  _analysis=dispatch_queue_create("vn.anhchugia35.legend.analysis",DISPATCH_QUEUE_SERIAL);
+ _slotIO=dispatch_queue_create("vn.anhchugia35.legend.slots",DISPATCH_QUEUE_SERIAL);
+ _vault=[[LGSaveVault alloc]init];_quickSlots=[[LGQuickSlots alloc]initWithVault:_vault];
  NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
  _controllerEnabled=[prefs objectForKey:@"gamepad_enabled"]?[prefs boolForKey:@"gamepad_enabled"]:YES;
  NSString* docs=NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES).firstObject;_root=[docs stringByAppendingPathComponent:@"Legend"];
@@ -134,6 +143,11 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _placeholder=[[UILabel alloc]init];_placeholder.text=@"Mở menu để nhập BIOS và chọn game";_placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
  _welcome=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"welcome.png"]];_welcome.contentMode=UIViewContentModeScaleAspectFit;[_screen addSubview:_welcome];
  _overlay=[[LGFusionOverlay alloc]init];[_screen addSubview:_overlay];
+ _quickNotice=[[UILabel alloc]init];_quickNotice.hidden=YES;_quickNotice.userInteractionEnabled=NO;
+ _quickNotice.font=[UIFont boldSystemFontOfSize:13];_quickNotice.textAlignment=NSTextAlignmentCenter;
+ _quickNotice.textColor=Gold();_quickNotice.adjustsFontSizeToFitWidth=YES;
+ _quickNotice.backgroundColor=[UIColor colorWithWhite:.03 alpha:.82];
+ _quickNotice.layer.cornerRadius=8;_quickNotice.clipsToBounds=YES;[_screen addSubview:_quickNotice];
  _guide=[[UITableView alloc]initWithFrame:CGRectZero style:UITableViewStylePlain];_guide.dataSource=self;_guide.delegate=self;_guide.backgroundColor=Ink();_guide.rowHeight=UITableViewAutomaticDimension;_guide.estimatedRowHeight=100;_guide.separatorColor=[Gold()colorWithAlphaComponent:.3];[self.view addSubview:_guide];
  _menu=[self tool:@"line.3.horizontal" label:@"Menu Legend" action:@selector(menu)];
  _save=[self tool:@"square.and.arrow.down" label:@"Lưu nhanh" action:@selector(save)];
@@ -192,10 +206,32 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _speedBadge.frame=CGRectMake(CGRectGetMinX(_speedButton.frame),CGRectGetMaxY(_speedButton.frame)-11,_speedButton.frame.size.width,10);
  _menu.frame=CGRectInset(LGRect(g.menu(),o),4,4);
  _placeholder.frame=CGRectInset(_screen.bounds,20,20);_welcome.frame=CGRectInset(_screen.bounds,10,10);_welcome.hidden=_ready;_overlay.frame=_screen.bounds;_overlay.hidden=_fusionMode==0;
+ _quickNotice.frame=CGRectMake(12,8,MAX(1,_screen.bounds.size.width-60),28);
  _save.enabled=_load.enabled=_ready;_save.alpha=_load.alpha=_ready?1:.4;[self.view setNeedsDisplay];
 }
 
 - (void)smokeProgress:(NSString*)phase{[phase writeToFile:[_root stringByAppendingPathComponent:@"smoke-progress.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];NSLog(@"Legend smoke: %@",phase);}
+- (BOOL)smokeQuickSlot{
+ NSMutableData* sample=[NSMutableData dataWithLength:32*1024];
+ auto* contents=static_cast<uint8_t*>(sample.mutableBytes);
+ for(size_t i=0;i<sample.length;i++)contents[i]=uint8_t(i%61);
+ NSString* path=[NSTemporaryDirectory() stringByAppendingPathComponent:
+  [NSString stringWithFormat:@"legend-smoke-%@.slot",NSUUID.UUID.UUIDString]];
+ NSString* purpose=@"legend/smoke/quick-slot";
+ NSError* error=nil;
+ BOOL written=[_quickSlots writeState:sample path:path purpose:purpose error:&error];
+ BOOL restored=written&&[[_quickSlots readState:path purpose:purpose error:&error] isEqualToData:sample];
+ BOOL bound=restored&&![_quickSlots readState:path purpose:@"legend/smoke/other-slot" error:nil];
+ NSMutableData* corrupted=[NSMutableData dataWithContentsOfFile:path];
+ if(corrupted.length>40){
+  static_cast<uint8_t*>(corrupted.mutableBytes)[25]^=1;
+  [corrupted writeToFile:path atomically:YES];
+ }
+ BOOL rejected=corrupted.length>40&&![_quickSlots readState:path purpose:purpose error:nil];
+ [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+ if(error)NSLog(@"Legend smoke slot: %@",error);
+ return restored&&bound&&rejected;
+}
 - (void)runSmoke{
  [self smokeProgress:@"request orientation"];
  NSString* mode=NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE_ORIENTATION"]?:@"portrait";BOOL landscape=[mode isEqualToString:@"landscape"];UIInterfaceOrientationMask mask=landscape?UIInterfaceOrientationMaskLandscapeLeft:UIInterfaceOrientationMaskPortrait;
@@ -214,7 +250,10 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  [self toggleSpeed];BOOL togglesToBoost=std::abs(self->_speed-3)<.001;
  [self setPlaybackSpeed:1];CGRect safe=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);BOOL expanded=portrait||std::abs(self->_screen.frame.size.height-safe.size.height)<9;
  [self->_logo layoutIfNeeded];BOOL roundLogo=self->_logo.hasCircularImage&&CGRectContainsRect(safe,self->_logo.frame);self->_logo.running=YES;BOOL ringStarted=self->_logo.hasRunningAnimation&&self->_logo.currentImage!=nil;[self stopAuto];BOOL ringStopped=ringStarted&&!self->_logo.running&&!self->_logo.hasRunningAnimation;
- [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"approved_background_loaded":@([(LGBackdrop*)self.view hasApprovedArtwork]),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo)};
+ [self smokeProgress:@"check protected quick slot"];
+ __block BOOL protectedSlot=NO;
+ dispatch_sync(self->_slotIO,^{protectedSlot=[self smokeQuickSlot];});
+ [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"approved_background_loaded":@([(LGBackdrop*)self.view hasApprovedArtwork]),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot)};
  NSData* json=[NSJSONSerialization dataWithJSONObject:report options:0 error:nil];[json writeToFile:[self->_root stringByAppendingPathComponent:[NSString stringWithFormat:@"simulator_smoke-%@.json",mode]] atomically:YES];
  });
 }
@@ -338,8 +377,15 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  [self presentViewController:sheet animated:YES completion:nil];
 }
 
-- (void)pick:(BOOL)bios{_pickMode=bios?1:0;[self pickMode:_pickMode];}
-- (void)pickMode:(NSInteger)mode{[self pause];_pickMode=mode;_pickingBIOS=mode==1;_operation=YES;UIDocumentPickerViewController* picker=[[UIDocumentPickerViewController alloc]initForOpeningContentTypes:@[UTTypeData] asCopy:NO];picker.delegate=self;picker.allowsMultipleSelection=NO;[self presentViewController:picker animated:YES completion:nil];}
+- (void)pick:(BOOL)bios{
+ [self pause];
+ _pickingBIOS=bios;
+ _operation=YES;
+ UIDocumentPickerViewController* picker=[[UIDocumentPickerViewController alloc]initForOpeningContentTypes:@[UTTypeData] asCopy:NO];
+ picker.delegate=self;
+ picker.allowsMultipleSelection=NO;
+ [self presentViewController:picker animated:YES completion:nil];
+}
 - (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller{_operation=NO;[self resumePlayback];}
 - (NSString*)importURL:(NSURL*)url bios:(BOOL)bios error:(NSError**)error {
  NSFileManager* fm=NSFileManager.defaultManager;NSString* ext=url.pathExtension.lowercaseString;if(!bios&&![@[@"iso",@"bin",@"img"] containsObject:ext]){*error=Failure(@"Hỗ trợ ISO, BIN và IMG một track. Hãy chọn bản ISO của mod.");return nil;}
@@ -359,31 +405,219 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  }];if(scoped)[url stopAccessingSecurityScopedResource];*error=coordinateError?:copyError;return result;
 }
 - (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
- if(_pickMode==3){_operation=NO;[self resumePlayback];return;}
- if(_pickMode==2){[self importCardURL:urls.firstObject];return;}
  if(!urls.count){_operation=NO;[self resume];return;}BOOL bios=_pickingBIOS;NSURL* url=urls.firstObject;[self pause];_operation=YES;_menu.enabled=NO;_placeholder.hidden=NO;_placeholder.text=@"Đang nhập file…";NSUInteger generation=_generation;if(!bios){generation=++_generation;_data.reset();_lastRam.reset();_duel={};_hasSelected=NO;dispatch_async(_analysis,^{self->_advisor.reset();self->_analysisData.reset();});}
  dispatch_async(_worker,^{NSError* error=nil;NSString* file=[self importURL:url bios:bios error:&error];BOOL success=file!=nil;
-  if(success&&!bios){[self persistCard];NSString* key=file.lastPathComponent.stringByDeletingPathExtension;NSString* cardFile=[[self->_root stringByAppendingPathComponent:@"saves"]stringByAppendingPathComponent:[key stringByAppendingPathExtension:@"mcr"]];NSData* oldCard=[NSData dataWithContentsOfFile:cardFile];BOOL cardValid=![NSFileManager.defaultManager fileExistsAtPath:cardFile]||(oldCard.length==131072&&((const uint8_t*)oldCard.bytes)[0]=='M'&&((const uint8_t*)oldCard.bytes)[1]=='C');std::string problem;if(!cardValid)problem="Thẻ nhớ cũ không hợp lệ. Giữ nguyên file để khôi phục.";success=cardValid&&self->_core->open(file.UTF8String,self->_root.UTF8String,problem);if(!success)error=Failure([NSString stringWithUTF8String:problem.c_str()]);else{self->_gameKey=file.lastPathComponent.stringByDeletingPathExtension;self->_core->setSpeed(self->_speed);NSData* card=[NSData dataWithContentsOfFile:[self cardPath]];if(card.length==131072){const auto* b=static_cast<const uint8_t*>(card.bytes);self->_core->setMemoryCard({b,b+card.length});}}}
+  if(success&&!bios){
+   [self persistCard];
+   NSString* key=file.lastPathComponent.stringByDeletingPathExtension;
+   NSData* card=[self readCardForKey:key error:&error];
+   std::string problem;
+   success=!error&&self->_core->open(file.UTF8String,self->_root.UTF8String,problem);
+   if(!success&&!error)error=Failure(LGText(problem));
+   if(success){
+    self->_gameKey=key;
+    self->_persistedCard.clear();
+    self->_core->setSpeed(self->_speed);
+    if(card){
+     const auto* bytes=static_cast<const uint8_t*>(card.bytes);
+     success=self->_core->setMemoryCard({bytes,bytes+card.length});
+     if(!success){
+      self->_gameKey=nil;
+      self->_core->close();
+      error=Failure(@"Core không nhận được thẻ nhớ.");
+     }else if([NSFileManager.defaultManager fileExistsAtPath:[self cardPathForKey:key extension:@"sealed"]]){
+      self->_persistedCard.assign(bytes,bytes+card.length);
+     }else{
+      [self persistCard];
+     }
+    }
+   }
+  }
   if(success&&!bios){dispatch_async(self->_analysis,^{std::shared_ptr<Legend::GameData> data;try{data=std::make_shared<Legend::GameData>(file.UTF8String);}catch(const std::exception& e){NSLog(@"Legend VIP: %s",e.what());}self->_advisor.reset();self->_analysisData=data;if(data)self->_advisor=std::make_unique<Legend::FusionAdvisor>(*data,Legend::defaultCompatibility().handSignatures);dispatch_async(dispatch_get_main_queue(),^{if(generation!=self->_generation)return;self->_data=data;[self->_guide reloadData];});});}
   double fps=self->_core->fps,rate=self->_core->sampleRate;BOOL loaded=self->_core->isLoaded();
   dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;self->_menu.enabled=YES;self->_ready=loaded;self->_fps=fps;self->_sampleRate=rate;self->_placeholder.hidden=loaded;if(!bios){self->_hasSelected=NO;self->_duel={};[self->_overlay showView:self->_duel row:nullptr];[self->_audioEngine stop];self->_audioEngine=nil;self->_audioSource=nil;self->_screen.image=nil;}[self.view setNeedsLayout];
    if(!success){self->_placeholder.text=@"LEGEND\n\nMở menu để nhập BIOS và chọn game";[self alert:@"Không nhập được file" text:error.localizedDescription?:@"Lỗi đọc file."];}
    else if(bios){self->_placeholder.text=@"LEGEND\n\nĐã nhập BIOS · Chọn Mở game trong menu";[self alert:@"Đã nhập BIOS" text:@"Chọn Mở game trong menu để bắt đầu. BIOS mới sẽ được dùng khi mở game lại."];}
-   if(success)[self resume];
+   if(success){if(!bios)[self preloadQuickSlot:self->_slot];[self resume];}
   });
  });
 }
-- (NSString*)cardPath{return [[_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:[_gameKey stringByAppendingPathExtension:@"mcr"]];}
+- (NSString*)cardPathForKey:(NSString*)key extension:(NSString*)extension{
+ return [[_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:[key stringByAppendingPathExtension:extension]];
+}
+- (NSData*)readCardForKey:(NSString*)key error:(NSError**)error{
+ NSFileManager* files=NSFileManager.defaultManager;
+ NSString* path=[self cardPathForKey:key extension:@"sealed"];
+ NSData* card=nil;
+ if([files fileExistsAtPath:path]){
+  NSDictionary* attrs=[files attributesOfItemAtPath:path error:error];
+  if(!attrs)return nil;
+  if(attrs.fileSize>131072+4096){*error=Failure(@"Kích thước thẻ nhớ không hợp lệ.");return nil;}
+  NSData* sealed=[NSData dataWithContentsOfFile:path options:0 error:error];
+  if(!sealed)return nil;
+  card=[_vault open:sealed purpose:[@"card/" stringByAppendingString:key] error:error];
+  if(!card)return nil;
+ }else{
+  NSString* legacy=[self cardPathForKey:key extension:@"mcr"];
+  if(![files fileExistsAtPath:legacy])return nil;
+  NSDictionary* attrs=[files attributesOfItemAtPath:legacy error:error];
+  if(!attrs)return nil;
+  if(attrs.fileSize!=131072){*error=Failure(@"Thẻ nhớ cũ không hợp lệ.");return nil;}
+  card=[NSData dataWithContentsOfFile:legacy options:0 error:error];
+  if(!card)return nil;
+ }
+ if(card.length!=131072||std::memcmp(card.bytes,"MC",2)){
+  *error=Failure(@"Thẻ nhớ không hợp lệ.");
+  return nil;
+ }
+ return card;
+}
+- (BOOL)commitCard:(const Legend::Bytes&)card error:(NSError**)error{
+ if(!_gameKey||card.size()!=131072||card[0]!='M'||card[1]!='C'){
+  *error=Failure(@"Thẻ nhớ không hợp lệ.");
+  return NO;
+ }
+ if(card==_persistedCard)return YES;
+ NSData* bytes=[NSData dataWithBytes:card.data() length:card.size()];
+ NSData* sealed=[_vault seal:bytes purpose:[@"card/" stringByAppendingString:_gameKey] error:error];
+ if(!sealed)return NO;
+ NSString* path=[self cardPathForKey:_gameKey extension:@"sealed"];
+ if(![sealed writeToFile:path options:NSDataWritingAtomic error:error])return NO;
+ _persistedCard=card;
+ NSString* legacy=[self cardPathForKey:_gameKey extension:@"mcr"];
+ NSFileManager* files=NSFileManager.defaultManager;
+ if([files fileExistsAtPath:legacy]){
+  NSString* archive=[legacy stringByAppendingString:@".legacy"];
+  if(![files fileExistsAtPath:archive])[files moveItemAtPath:legacy toPath:archive error:nil];
+ }
+ return YES;
+}
 - (NSString*)statePath:(NSInteger)slot{return [[_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_slot%02ld.state",_gameKey,(long)slot]];}
-- (void)persistCard{if(!_gameKey)return;auto bytes=_core->memoryCard();if(bytes.empty())return;NSData* data=[NSData dataWithBytes:bytes.data() length:bytes.size()];NSError* error=nil;if(![data writeToFile:[self cardPath] options:NSDataWritingAtomic error:&error])NSLog(@"Legend card: %@",error);}
-- (BOOL)backup:(NSString*)path{if(![NSFileManager.defaultManager fileExistsAtPath:path])return YES;NSData* old=[NSData dataWithContentsOfFile:path];return old&&[old writeToFile:[path stringByAppendingString:@".bak"] options:NSDataWritingAtomic error:nil];}
+- (void)persistCard{
+ if(!_gameKey||!_core->isLoaded())return;
+ auto bytes=_core->memoryCard();
+ if(bytes.empty())return;
+ NSError* error=nil;
+ if(![self commitCard:bytes error:&error])NSLog(@"Legend card: %@",error);
+}
+- (NSString*)sealedSlotPath:(NSInteger)slot{return [[[self statePath:slot] stringByDeletingPathExtension] stringByAppendingPathExtension:@"slot"];}
+- (NSString*)slotPurpose:(NSInteger)slot version:(NSString*)version{
+ return [NSString stringWithFormat:@"slot/v1/%@/%ld/%@",_gameKey,(long)slot,version];
+}
+- (void)quickStatus:(NSString*)status{
+ _quickNotice.text=status;
+ _quickNotice.hidden=NO;
+ UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,status);
+ NSUInteger revision=++_quickNoticeRevision;
+ dispatch_after(dispatch_time(DISPATCH_TIME_NOW,static_cast<int64_t>(1.6*NSEC_PER_SEC)),dispatch_get_main_queue(),^{
+  if(revision==self->_quickNoticeRevision)self->_quickNotice.hidden=YES;
+ });
+}
+- (void)preloadQuickSlot:(NSInteger)slot{
+ dispatch_async(_worker,^{
+  if(!self->_gameKey||!self->_core->isLoaded())return;
+  NSString* path=[self sealedSlotPath:slot];
+  NSString* purpose=[self slotPurpose:slot version:LGText(self->_core->coreVersion())];
+  dispatch_async(self->_slotIO,^{
+   if([NSFileManager.defaultManager fileExistsAtPath:path])
+    [self->_quickSlots readState:path purpose:purpose error:nil];
+  });
+ });
+}
+- (NSData*)legacySlot:(NSString*)path key:(NSString*)gameKey version:(NSString*)version slot:(NSInteger)slot{
+ NSData* bytes=[NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:nil];
+ BOOL didUseOriginal=NO;
+ if(!bytes&&slot==1){
+  NSString* original=[[path stringByDeletingLastPathComponent]
+   stringByAppendingPathComponent:[gameKey stringByAppendingPathExtension:@"state"]];
+  bytes=[NSData dataWithContentsOfFile:original options:NSDataReadingMappedIfSafe error:nil];
+  didUseOriginal=bytes!=nil;
+ }
+ if(!bytes.length||bytes.length>64*1024*1024)return nil;
+ if(didUseOriginal)return bytes;
+ NSData* meta=[NSData dataWithContentsOfFile:[path stringByAppendingString:@".json"]];
+ if(!meta)return nil;
+ id record=[NSJSONSerialization JSONObjectWithData:meta options:0 error:nil];
+ if(![record isKindOfClass:NSDictionary.class])return nil;
+ NSDictionary* metadata=record;
+ if(![metadata[@"game_sha256"]isEqual:gameKey]||![metadata[@"version"]isEqual:version]||
+    ![metadata[@"state_sha256"]isEqual:Digest(bytes)])return nil;
+ return bytes;
+}
 - (void)save{
- if(!_ready||_operation)return;[self pause];_operation=YES;NSInteger slot=_slot;dispatch_async(_worker,^{auto state=self->_core->saveState();NSData* bytes=state.empty()?nil:[NSData dataWithBytes:state.data() length:state.size()];NSString* path=[self statePath:slot];NSString* meta=[path stringByAppendingString:@".json"];NSError* error=nil;BOOL ok=bytes!=nil;
- if(ok){NSDictionary* record=@{@"game_sha256":self->_gameKey,@"state_sha256":Digest(bytes),@"version":LGText(self->_core->coreVersion()),@"slot":@(slot),@"created":@(NSDate.date.timeIntervalSince1970)};NSData* json=[NSJSONSerialization dataWithJSONObject:record options:NSJSONWritingPrettyPrinted error:&error];ok=[self backup:path]&&[self backup:meta]&&json&&[bytes writeToFile:path options:NSDataWritingAtomic error:&error]&&[json writeToFile:meta options:NSDataWritingAtomic error:&error];}[self persistCard];dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;[self alert:ok?@"Đã lưu nhanh":@"Không lưu được" text:ok?[NSString stringWithFormat:@"Slot %ld · riêng cho game này",(long)slot]:error.localizedDescription?:@"Core không tạo được save."];});});
+ if(!_ready||_operation)return;
+ [self stopAuto];
+ _operation=YES;
+ NSInteger slot=_slot;
+ NSUInteger generation=_generation;
+ dispatch_async(_worker,^{
+  auto state=self->_core->saveState();
+  NSData* bytes=state.empty()?nil:[NSData dataWithBytes:state.data() length:state.size()];
+  if(bytes){
+   NSString* path=[self sealedSlotPath:slot];
+   NSString* purpose=[self slotPurpose:slot version:LGText(self->_core->coreVersion())];
+   [self persistCard];
+   dispatch_async(self->_slotIO,^{
+    NSError* error=nil;
+    BOOL ok=[self->_quickSlots writeState:bytes path:path purpose:purpose error:&error];
+    dispatch_async(dispatch_get_main_queue(),^{
+     if(generation!=self->_generation)return;
+     if(ok)[self quickStatus:[NSString stringWithFormat:@"Đã lưu slot %ld",(long)slot]];
+     else [self alert:@"Không lưu được" text:error.localizedDescription?:@"Không ghi được slot."];
+    });
+   });
+  }
+  dispatch_async(dispatch_get_main_queue(),^{
+   self->_operation=NO;
+   if(!bytes)[self alert:@"Không lưu được" text:@"Core không tạo được save."];
+  });
+ });
 }
 - (void)load{
- if(!_ready||_operation)return;[self pause];++_generation;_lastRam.reset();_operation=YES;NSInteger slot=_slot;dispatch_async(_worker,^{NSString* path=[self statePath:slot];BOOL legacy=NO;NSData* bytes=[NSData dataWithContentsOfFile:path];if(!bytes&&slot==1){path=[[self->_root stringByAppendingPathComponent:@"saves"] stringByAppendingPathComponent:[self->_gameKey stringByAppendingPathExtension:@"state"]];bytes=[NSData dataWithContentsOfFile:path];legacy=bytes!=nil;}
- NSDictionary* meta=[NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:[path stringByAppendingString:@".json"]]?:[NSData data] options:0 error:nil];BOOL valid=legacy||([meta[@"game_sha256"]isEqualToString:self->_gameKey]&&[meta[@"version"]isEqualToString:LGText(self->_core->coreVersion())]&&[meta[@"state_sha256"]isEqualToString:Digest(bytes?:[NSData data])]);BOOL ok=NO;if(valid&&bytes.length&&bytes.length<=64*1024*1024){const auto* p=static_cast<const uint8_t*>(bytes.bytes);ok=self->_core->loadState({p,p+bytes.length});}dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;[self releaseButtons];self->_hasSelected=NO;self->_duel={};[self->_overlay showView:self->_duel row:nullptr];if(ok)[self resume];else [self alert:@"Chưa tải được slot" text:@"Slot trống, khác phiên bản core hoặc checksum không đúng. Bản lưu cũ vẫn được giữ nguyên."];});});
+ if(!_ready||_operation)return;
+ [self pause];
+ ++_generation;
+ _lastRam.reset();
+ _operation=YES;
+ NSInteger slot=_slot;
+ dispatch_async(_worker,^{
+  NSString* path=[self sealedSlotPath:slot],*oldPath=[self statePath:slot];
+  NSString* identity=self->_gameKey,*version=LGText(self->_core->coreVersion());
+  NSString* purpose=[self slotPurpose:slot version:version];
+  dispatch_async(self->_slotIO,^{
+   NSError* error=nil;
+   NSData* state=[NSFileManager.defaultManager fileExistsAtPath:path]?
+    [self->_quickSlots readState:path purpose:purpose error:&error]:
+    [self legacySlot:oldPath key:identity version:version slot:slot];
+   dispatch_async(self->_worker,^{
+    BOOL ok=NO,fatal=NO;
+    if(state){
+     auto checkpoint=self->_core->saveState();
+     auto card=self->_core->memoryCard();
+     const auto* bytes=static_cast<const uint8_t*>(state.bytes);
+     if(!checkpoint.empty()&&card.size()==131072){
+      ok=self->_core->loadState({bytes,bytes+state.length})&&self->_core->setMemoryCard(card);
+      if(!ok){
+       bool restored=self->_core->loadState(checkpoint);
+       bool cardRestored=self->_core->setMemoryCard(card);
+       fatal=!restored||!cardRestored;
+       if(fatal){self->_gameKey=nil;self->_core->close();}
+      }
+     }
+    }
+    dispatch_async(dispatch_get_main_queue(),^{
+     self->_operation=NO;
+     if(fatal)self->_ready=NO;
+     [self releaseButtons];
+     self->_hasSelected=NO;
+     self->_duel={};
+     [self->_overlay showView:self->_duel row:nullptr];
+     if(ok){[self quickStatus:[NSString stringWithFormat:@"Đã tải slot %ld",(long)slot]];[self resume];}
+     else [self alert:@"Chưa tải được slot" text:error.localizedDescription?:@"Slot trống, sai phiên bản hoặc không hợp lệ."];
+    });
+   });
+  });
+ });
 }
 
 - (void)pause{[self stopAuto];_paused=YES;_clock=0;[self releaseButtons];[_audioEngine pause];_core->audio.clear();}
@@ -506,7 +740,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (LGSettingsController*)configuredSettings{
  LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;__weak LGPlayer* weak=self;
- settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];[owner.view setNeedsLayout];};
+ settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;BOOL slotChanged=owner->_slot!=s.slot;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];if(slotChanged)[owner preloadQuickSlot:s.slot];[owner.view setNeedsLayout];};
  settings.closed=^{[weak resumePlayback];};settings.command=^(NSString* command){[weak command:command];};return settings;
 }
 - (void)settings{
@@ -514,15 +748,11 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (void)command:(NSString*)command{
  if([command isEqualToString:@"bios"]){[self pick:YES];return;}if([command isEqualToString:@"license"]){NSString* path=[NSBundle.mainBundle pathForResource:@"LICENSES" ofType:@"txt"];NSString* text=[NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil]?:@"SwanStation — GPLv3\nMã nguồn: https://github.com/xuyendem249-cloud/Mod_LOGs";UIViewController* vc=[[UIViewController alloc]init];vc.title=@"Mã nguồn & giấy phép";UITextView* view=[[UITextView alloc]init];view.text=text;view.editable=NO;view.backgroundColor=Ink();view.textColor=UIColor.whiteColor;view.font=[UIFont systemFontOfSize:13];vc.view=view;vc.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(closeDocument)];UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:vc];nav.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:nav animated:YES completion:nil];return;}
- if(!_ready){[self alert:@"Chưa mở game" text:@"Hãy mở đúng game trước."];return;}if([command isEqualToString:@"save"]){[self save];return;}if([command isEqualToString:@"load"]){[self load];return;}if([command isEqualToString:@"cardIn"]){[self confirm:@"Nhập thẻ nhớ?" text:@"Sao lưu thẻ hiện tại rồi thay bằng file RAW 128 KB. Game sẽ khởi động lại." action:^{[self pickMode:2];}];return;}if([command isEqualToString:@"cardOut"]){[self exportCard];return;}
+ if(!_ready){[self alert:@"Chưa mở game" text:@"Hãy mở đúng game trước."];return;}
  if([command isEqualToString:@"reset"])[self confirm:@"Khởi động lại game?" text:@"Thẻ nhớ được lưu trước khi khởi động lại. Tiến trình chưa lưu trong game sẽ mất." action:^{++self->_generation;self->_lastRam.reset();self->_operation=YES;dispatch_async(self->_worker,^{[self persistCard];self->_core->reset();dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;self->_duel={};self->_hasSelected=NO;[self->_overlay showView:self->_duel row:nullptr];[self resumePlayback];});});}];
 }
 - (void)closeDocument{[self dismissViewControllerAnimated:YES completion:^{[self resumePlayback];}];}
 - (void)confirm:(NSString*)title text:(NSString*)text action:(void(^)(void))callback{UIAlertController* a=[UIAlertController alertControllerWithTitle:title message:text preferredStyle:UIAlertControllerStyleAlert];[a addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[self resumePlayback];}]];[a addAction:[UIAlertAction actionWithTitle:@"Tiếp tục" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){callback();}]];[self presentViewController:a animated:YES completion:nil];}
-- (void)importCardURL:(NSURL*)url{
- if(!url){_operation=NO;[self resumePlayback];return;}++_generation;_lastRam.reset();_operation=YES;dispatch_async(_worker,^{BOOL scope=[url startAccessingSecurityScopedResource];__block NSData* bytes=nil;NSFileCoordinator* coordinator=[[NSFileCoordinator alloc]init];NSError* error=nil;[coordinator coordinateReadingItemAtURL:url options:0 error:&error byAccessor:^(NSURL* location){NSDictionary* info=[NSFileManager.defaultManager attributesOfItemAtPath:location.path error:nil];if(info.fileSize==131072)bytes=[NSData dataWithContentsOfURL:location];}];if(scope)[url stopAccessingSecurityScopedResource];BOOL ok=bytes.length==131072&&((const uint8_t*)bytes.bytes)[0]=='M'&&((const uint8_t*)bytes.bytes)[1]=='C';if(ok){[self persistCard];BOOL backed=[self backup:[self cardPath]];const uint8_t* b=(const uint8_t*)bytes.bytes;ok=backed&&self->_core->setMemoryCard({b,b+bytes.length});if(ok){[self persistCard];self->_core->reset();}}dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;[self alert:ok?@"Đã nhập thẻ nhớ":@"Không nhập được thẻ nhớ" text:ok?@"Chọn LOAD trong game.":@"Chỉ nhận thẻ nhớ RAW .mcr/.mcd đúng 128 KB, có chữ ký MC."];});});
-}
-- (void)exportCard{_operation=YES;dispatch_async(_worker,^{[self persistCard];auto card=self->_core->memoryCard();NSString* directory=[self->_root stringByAppendingPathComponent:@"exports"];[NSFileManager.defaultManager createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];NSString* path=[directory stringByAppendingPathComponent:@"Legend-memory-card.mcr"];BOOL ok=card.size()==131072&&[[NSData dataWithBytes:card.data() length:card.size()]writeToFile:path options:NSDataWritingAtomic error:nil];dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;if(!ok){[self alert:@"Không xuất được thẻ" text:@"Không đọc được thẻ nhớ."];return;}UIDocumentPickerViewController* picker=[[UIDocumentPickerViewController alloc]initForExportingURLs:@[[NSURL fileURLWithPath:path]] asCopy:YES];picker.delegate=self;self->_pickMode=3;[self presentViewController:picker animated:YES completion:nil];});});}
 - (void)tick:(CADisplayLink*)link {
  if(!_ready||_paused||_background||_inFlight)return;double now=link.timestamp;if(!_clock)_clock=now-1.0/_fps;double elapsed=std::clamp(now-_clock,0.,.1);_clock=now;_frameDebt+=elapsed*_fps*_speed;int count=MIN(8,int(_frameDebt));if(count<1)return;_frameDebt-=count;_inFlight=YES;NSUInteger generation=_generation;BOOL snapshot=!_analyzing&&now-_lastSnapshot>=.15;if(snapshot){_analyzing=YES;_lastSnapshot=now;}
  dispatch_async(_worker,^{BOOL changed=NO;for(int i=0;i<count;i++){

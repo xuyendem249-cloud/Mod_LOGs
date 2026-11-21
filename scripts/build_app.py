@@ -10,15 +10,15 @@ def main(sdk):
  clang=capture(['xcrun','--sdk',sdk,'--find','clang++'])
  folder=ROOT/'build'/sdk;app=folder/'Legend.app';app.mkdir(exist_ok=True)
  target='arm64-apple-ios17.0'+('-simulator' if sdk=='iphonesimulator' else '')
- app_sources=('main.mm','LegendViews.mm')
+ app_sources=('main.mm','LegendViews.mm','LegendSaveVault.mm')
  core_sources=('PlayerCore.cpp','Digest.cpp','GameData.cpp','FusionAdvisor.cpp','CollectionSnapshot.cpp',
                'DeckPlanner.cpp','DeckTransfer.cpp','Gacha.cpp')
  sources=[*(ROOT/'Sources/App'/name for name in app_sources),*(ROOT/'Sources/Core'/name for name in core_sources)]
  args=[clang,'-target',target,'-isysroot',sdkroot,'-std=c++17','-fobjc-arc','-fblocks','-O2','-g','-Wall','-Wextra','-Wno-unused-parameter','-Wno-deprecated-declarations','-I'+str(ROOT/'Sources/Core'),'-I'+str(ROOT/'vendor/swanstation/dep/libretro-common/include'),*sources,folder/'LegendSwanStation.a','-o',app/'Legend']
  # The direct clang build does not enable Clang module autolinking. Link the
  # CoreGraphics APIs used by main.mm explicitly for device AND simulator.
- for framework in ['UIKit','Foundation','CoreFoundation','CoreGraphics','AVFoundation','AudioToolbox','QuartzCore','UniformTypeIdentifiers','GameController']:args+=['-framework',framework]
- args+=['-lobjc'];run(args)
+ for framework in ['UIKit','Foundation','CoreFoundation','CoreGraphics','AVFoundation','AudioToolbox','QuartzCore','UniformTypeIdentifiers','GameController','Security']:args+=['-framework',framework]
+ args+=['-lobjc','-lz'];run(args)
  info=plistlib.loads((ROOT/'Resources/Info.plist').read_bytes());info['CFBundleSupportedPlatforms']=['iPhoneSimulator' if sdk=='iphonesimulator' else 'iPhoneOS'];info['DTPlatformName']=sdk;info['DTSDKName']=sdk+capture(['xcrun','--sdk',sdk,'--show-sdk-version'])
  for name in ['AppLogo.png','welcome.png','DuelTemple-v1.png','LICENSES.txt']:shutil.copyfile(ROOT/'Resources'/name,app/name)
  # Use Apple's own asset compiler for the app icon. Never package personal game files.

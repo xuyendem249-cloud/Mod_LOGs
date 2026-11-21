@@ -316,6 +316,46 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  return NO;
 #endif
 }
+- (BOOL)smokeGachaWallet:(NSString*)orientation{
+#if TARGET_OS_SIMULATOR
+ NSURL* empty=[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"smoke-no-media"];
+ LGGachaController* gacha=[[LGGachaController alloc]initWithData:std::shared_ptr<Legend::GameData>{}
+  stars:7350 media:empty queue:_analysis];
+ [gacha loadViewIfNeeded];
+ gacha.view.frame=self.view.bounds;
+ [gacha.view setNeedsLayout];[gacha.view layoutIfNeeded];
+ UIView* wallet=nil;
+ for(UIView* view in gacha.view.subviews)
+  if([view.accessibilityIdentifier isEqualToString:@"gacha-star-wallet"]){wallet=view;break;}
+ if(CGRectIsEmpty(wallet.bounds))return NO;
+ size_t w=static_cast<size_t>(ceil(wallet.bounds.size.width)),h=static_cast<size_t>(wallet.bounds.size.height);
+ std::vector<uint8_t> pixels(w*h*4);
+ CGColorSpaceRef color=CGColorSpaceCreateDeviceRGB();
+ CGContextRef canvas=CGBitmapContextCreate(pixels.data(),w,h,8,w*4,color,
+  kCGImageAlphaPremultipliedLast|kCGBitmapByteOrder32Big);
+ CGColorSpaceRelease(color);
+ if(!canvas)return NO;
+ CGContextTranslateCTM(canvas,0,h);CGContextScaleCTM(canvas,1,-1);
+ [wallet.layer renderInContext:canvas];
+ unsigned bright=0,dark=0;
+ for(size_t y=5;y+5<h;y++)for(size_t x=8;x+8<w;x++){
+  const uint8_t* pixel=&pixels[(y*w+x)*4];
+  bright+=pixel[0]>=245&&pixel[1]>=205&&pixel[2]>=125&&pixel[3]==255;
+  dark+=pixel[0]<=55&&pixel[1]<=45&&pixel[2]<=45&&pixel[3]==255;
+ }
+ CGImageRef captured=CGBitmapContextCreateImage(canvas);
+ if(captured){
+  NSData* png=UIImagePNGRepresentation([UIImage imageWithCGImage:captured]);
+  [png writeToFile:[_root stringByAppendingPathComponent:
+   [NSString stringWithFormat:@"gacha-wallet-%@.png",orientation]] atomically:YES];
+  CGImageRelease(captured);
+ }
+ CGContextRelease(canvas);
+ return bright>=30&&dark>=w*h/3;
+#else
+ return NO;
+#endif
+}
 - (void)runSmoke{
  [self smokeProgress:@"request orientation"];
  NSString* mode=NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE_ORIENTATION"]?:@"portrait";BOOL landscape=[mode isEqualToString:@"landscape"];UIInterfaceOrientationMask mask=landscape?UIInterfaceOrientationMaskLandscapeLeft:UIInterfaceOrientationMaskPortrait;
@@ -340,7 +380,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  CGRect deck=((LGBackdrop*)self.view).bezelFrame;
  BOOL console=CGRectContainsRect(deck,self->_screen.frame)&&CGRectContainsRect(safe,self->_faceWell.frame)&&
   CGRectContainsRect(safe,self->_dpad.frame)&&self->_pads[@4].hidden&&self->_pads[@8].frame.size.width>0;
- [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"console_skin_layout":@(console),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot),@"device_keychain_tested":@NO};
+ BOOL brightGachaWallet=[self smokeGachaWallet:mode];
+ [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"console_skin_layout":@(console),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot),@"gacha_star_readability":@(brightGachaWallet),@"device_keychain_tested":@NO};
  NSData* json=[NSJSONSerialization dataWithJSONObject:report options:0 error:nil];[json writeToFile:[self->_root stringByAppendingPathComponent:[NSString stringWithFormat:@"simulator_smoke-%@.json",mode]] atomically:YES];
  });
 }

@@ -4,6 +4,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <QuartzCore/QuartzCore.h>
 #include "Gacha.hpp"
+#include "GachaPackPose.hpp"
 #include <cmath>
 
 namespace {
@@ -107,12 +108,74 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
 }
 @end
 
+@interface LGGachaPack:UIView
+- (instancetype)initWithFaces:(NSArray<UIImage*>*)faces;
+- (void)renderTurn:(CFTimeInterval)elapsed;
+@end
+
+@implementation LGGachaPack{
+ NSArray<UIImage*>* _faces;
+ CALayer* _texture;
+ CAShapeLayer* _edge;
+}
+- (instancetype)initWithFaces:(NSArray<UIImage*>*)faces{
+ if((self=[super initWithFrame:CGRectZero])){
+  _faces=[faces copy];
+  self.clipsToBounds=YES;
+  self.userInteractionEnabled=NO;
+  _texture=[CALayer layer];_texture.minificationFilter=kCAFilterLinear;_texture.magnificationFilter=kCAFilterLinear;
+  _texture.allowsEdgeAntialiasing=YES;
+  _edge=[CAShapeLayer layer];_edge.fillColor=color(0xffca894d).CGColor;
+  [self.layer addSublayer:_edge];[self.layer addSublayer:_texture];
+ }
+ return self;
+}
+- (void)renderTurn:(CFTimeInterval)elapsed{
+ if(!_faces.count||CGRectIsEmpty(self.bounds))return;
+ const Legend::Gacha::PackPose pose(elapsed);
+ UIImage* face=_faces[pose.face];
+ CGFloat scale=MIN(self.bounds.size.width/face.size.width,self.bounds.size.height/face.size.height)*.92;
+ CGFloat hw=face.size.width*scale/2,hh=face.size.height*scale/2;
+ CGFloat depth=MAX(1,hw*.034),distance=hw*8;
+ CGFloat cx=CGRectGetMidX(self.bounds),cy=CGRectGetMidY(self.bounds);
+ CGFloat z=-depth*pose.side;
+
+ // Project the front and rear textures with the same camera and depth as Ver 92.
+ CATransform3D projection=CATransform3DIdentity;
+ projection.m11=pose.width;
+ projection.m41=z*pose.sine;
+ projection.m14=-pose.side*pose.sine/distance;
+ projection.m44=1+z*pose.cosine/distance;
+
+ [CATransaction begin];[CATransaction setDisableActions:YES];
+ _texture.bounds=CGRectMake(0,0,hw*2,hh*2);
+ _texture.position=CGPointMake(cx,cy);
+ _texture.contents=(__bridge id)face.CGImage;
+ _texture.transform=projection;
+ _texture.hidden=!pose.showTexture();
+ _edge.opacity=pose.edgeOpacity();
+ if(_edge.opacity>0){
+  CGFloat x=(pose.sine>=0?1:-1)*hw*.77,halfEdge=MAX(.65,depth*.48);
+  auto project=[&](CGFloat y,CGFloat edgeZ){
+   CGFloat factor=distance/(distance-x*pose.sine+edgeZ*pose.cosine);
+   return CGPointMake(cx+(x*pose.cosine+edgeZ*pose.sine)*factor,cy+y*factor);
+  };
+  UIBezierPath* rim=[UIBezierPath bezierPath];
+  [rim moveToPoint:project(-hh*.94,-halfEdge)];
+  [rim addLineToPoint:project(-hh*.94,halfEdge)];
+  [rim addLineToPoint:project(hh*.94,halfEdge)];
+  [rim addLineToPoint:project(hh*.94,-halfEdge)];
+  [rim closePath];_edge.path=rim.CGPath;
+ }
+ [CATransaction commit];
+}
+@end
+
 @implementation LGGachaController{
  std::shared_ptr<Legend::GameData> _game;
  dispatch_queue_t _queue;
  NSURL* _media;
  NSInteger _balance;
- NSArray<UIImage*>* _faces;
  NSArray<NSNumber*>* _tiers;
  AVQueuePlayer* _ambient;
  AVPlayerLooper* _ambientLoop;
@@ -127,9 +190,9 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  CADisplayLink* _link;
  CFTimeInterval _started;
  LGGoldPodium* _podium;
- UIImageView* _pack;
+ LGGachaPack* _pack;
  UIScrollView* _choices;
- UIView* _menu,*_results;
+ UIView* _menu,*_results,*_wallet;
  UILabel* _stars,*_message;
  UIButton* _close,*_again,*_tapPack;
  UIStackView* _boxes,*_giftRow;
@@ -172,14 +235,19 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  _podium=[[LGGoldPodium alloc]init];_podium.opaque=NO;_podium.backgroundColor=UIColor.clearColor;
  _podium.art=mediaImage(_media,@"podium.png");[_menu addSubview:_podium];
  UIImage* first=mediaImage(_media,@"pack.png");
- if(first)_faces=@[first,mediaImage(_media,@"kaiba.png")?:first,mediaImage(_media,@"jonouchi.png")?:first];
- _pack=[[UIImageView alloc]initWithImage:first];_pack.contentMode=UIViewContentModeScaleAspectFit;
+ NSArray* faces=first?@[first,mediaImage(_media,@"kaiba.png")?:first,mediaImage(_media,@"jonouchi.png")?:first]:@[];
+ _pack=[[LGGachaPack alloc]initWithFaces:faces];
  [_menu addSubview:_pack];
  _tapPack=[UIButton buttonWithType:UIButtonTypeCustom];_tapPack.tag=1;_tapPack.accessibilityLabel=@"Pack x1";
  [_tapPack addTarget:self action:@selector(open:) forControlEvents:UIControlEventTouchUpInside];[_menu addSubview:_tapPack];
- _stars=label(23,color(0xffffd77c));
- _walletTint=tint(_stars,0xf233261d,0xf215101b,0xffce9a54,12);
- [self.view addSubview:_stars];[self updateStars];
+ _wallet=[[UIView alloc]init];
+ _wallet.userInteractionEnabled=NO;
+ _wallet.accessibilityIdentifier=@"gacha-star-wallet";
+ _walletTint=tint(_wallet,0xff30231a,0xff151019,0xffdcad57,12);
+ _stars=label(25,color(0xffffe5a0));
+ _stars.font=[UIFont monospacedDigitSystemFontOfSize:25 weight:UIFontWeightHeavy];
+ [_wallet addSubview:_stars];
+ [self.view addSubview:_wallet];[self updateStars];
  _close=action(@"×",UIColor.clearColor,self,@selector(close));_close.titleLabel.font=[UIFont boldSystemFontOfSize:22];
  _close.layer.borderWidth=0;
  _closeTint=tint(_close,0xff922f40,0xff641b2b,0xffce6870,12);
@@ -264,9 +332,10 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  _openingLayer.frame=CGRectMake(CGRectGetMidX(bounds)-openingSize.width/2,CGRectGetMidY(bounds)-openingSize.height/2,openingSize.width,openingSize.height);
  _results.frame=bounds;
  CGSize wallet=[_stars sizeThatFits:CGSizeMake(w-90,44)];
- _stars.frame=CGRectMake(x+16,y+9,MAX(84,ceil(wallet.width)+26),44);
+ _wallet.frame=CGRectMake(x+16,y+9,MAX(84,ceil(wallet.width)+26),44);
+ _stars.frame=_wallet.bounds;
  _close.frame=CGRectMake(CGRectGetMaxX(safe)-60,y+9,44,44);
- _walletTint.frame=_stars.bounds;_closeTint.frame=_close.bounds;
+ _walletTint.frame=_wallet.bounds;_closeTint.frame=_close.bounds;
  CGFloat top=y+53,width=MAX(1,w-32);
  CGFloat bottom=CGRectGetMaxY(safe);
  CGFloat keyboardTop=self.view.keyboardLayoutGuide.layoutFrame.origin.y;
@@ -304,15 +373,10 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  if(_rewardLayer&&_rewardLayer.readyForDisplay&&_rewardLayer.opacity==0){
   [CATransaction begin];[CATransaction setDisableActions:YES];_rewardLayer.opacity=1;[CATransaction commit];
  }
- if(_menu.hidden||!_faces.count)return;
- double elapsed=link.timestamp-_started;
- double angle=std::fmod(MAX(0,elapsed),24.)*2*M_PI/8;
- size_t face=static_cast<size_t>((angle+M_PI/2)/M_PI)%_faces.count;
- _pack.image=_faces[face];
- CATransform3D perspective=CATransform3DIdentity;
- perspective.m34=-1/MAX(1,_pack.bounds.size.width*4);
- _pack.layer.transform=CATransform3DRotate(perspective,std::cos(angle)<0?angle-M_PI:angle,0,1,0);
- _podium.elapsed=MAX(0,elapsed);[_podium setNeedsDisplay];
+ if(_menu.hidden)return;
+ double elapsed=MAX(0,link.timestamp-_started);
+ [_pack renderTurn:elapsed];
+ _podium.elapsed=elapsed;[_podium setNeedsDisplay];
 }
 - (void)updateStars{
  NSString* number=[NSNumberFormatter localizedStringFromNumber:@(_balance) numberStyle:NSNumberFormatterDecimalStyle];
@@ -358,7 +422,7 @@ CAGradientLayer* tint(UIView* view,uint32_t top,uint32_t bottom,uint32_t border,
  _openingLayer=[AVPlayerLayer playerLayerWithPlayer:_opening];
  _openingLayer.frame=self.view.bounds;_openingLayer.opacity=0;
  _openingLayer.videoGravity=AVLayerVideoGravityResizeAspect;
- [self.view.layer insertSublayer:_openingLayer below:_stars.layer];
+ [self.view.layer insertSublayer:_openingLayer below:_wallet.layer];
  [self.view setNeedsLayout];
  __weak LGGachaController* weak=self;
  _openingEnd=[NSNotificationCenter.defaultCenter addObserverForName:AVPlayerItemDidPlayToEndTimeNotification

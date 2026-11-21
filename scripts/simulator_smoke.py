@@ -1,5 +1,5 @@
 """Launch the unsigned/ad-hoc simulator build. No BIOS/game is imported."""
-import json,os,subprocess,time
+import json,os,shutil,subprocess,time
 from build_core import ROOT,run,capture
 
 def main():
@@ -33,7 +33,11 @@ def main():
     for progress in (data/'Documents/Legend').glob('smoke-progress*'):print(progress.name,progress.read_text())
     raise RuntimeError('App did not finish '+orientation+' smoke within 120 seconds; runtime log and screenshot preserved')
    current=json.loads(marker.read_text())
-   fields=('app_launched','all_14_buttons_inside_view','console_skin_layout','orientation_matches','quick_icons_overlay_game','speed_text_sync','speed_toggle','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops','circular_logo','authenticated_quick_slot')
+   sample=data/('Documents/Legend/gacha-wallet-'+orientation+'.png')
+   artifacts=ROOT/'build/app-artifacts'
+   artifacts.mkdir(exist_ok=True)
+   if sample.exists():shutil.copyfile(sample,artifacts/sample.name)
+   fields=('app_launched','all_14_buttons_inside_view','console_skin_layout','orientation_matches','quick_icons_overlay_game','speed_text_sync','speed_toggle','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops','circular_logo','authenticated_quick_slot','gacha_star_readability')
    if not all(current[field] for field in fields):
     diagnostic=subprocess.run(['xcrun','simctl','spawn',device,'log','show','--last','5m','--style','compact','--predicate','process == "Legend"'],capture_output=True,text=True)
     (ROOT/'build/iphonesimulator/smoke-runtime.log').write_text(diagnostic.stdout+'\n'+diagnostic.stderr)

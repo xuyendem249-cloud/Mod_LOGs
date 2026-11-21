@@ -33,14 +33,14 @@ public:
  bool stopped=false,seenDuel=false;std::string status="Chờ lượt của bạn",lastAction;
  AutoPlayer(GameData& d,FusionAdvisor& a):data(d),advisor(a){}
  static int b(const Bytes& r,int p){return r[p];}static int h(const Bytes& r,int p){return u16(r,p);}static int s(const Bytes& r,int p){return int16_t(u16(r,p));}
- uint32_t descriptor(int id,const Bytes& r)const{return id<1||id>722?0:u32(r,0x1d4244+(id-1)*4);}
+ uint32_t descriptor(int id,const Bytes& r)const{return data.descriptor(id,&r);}
  int type(int id,const Bytes& r)const{return (descriptor(id,r)>>26)&31;}
  int star(int id,int second,const Bytes& r)const{return (descriptor(id,r)>>(second?18:22))&15;}
  static int matchup(int a,int z){if(a<1||a>10||z<1||z>10||(a<=6)!=(z<=6))return 0;int base=a<=6?1:7,n=a<=6?6:4,x=a-base,y=z-base;if((x+1)%n==y)return 500;return (y+1)%n==x?-500:0;}
  int cap(const Bytes& r,bool defense)const{auto word=u32(r,defense?0x17120:0x170f4);return (word>>16)==unsigned(defense?0x2403:0x2405)?word&65535:30000;}
  int clamp(int value,const Bytes& r,bool defense)const{return std::clamp(value,0,cap(r,defense));}
  std::optional<Card> record(const Bytes& r,int index,int col)const{
-  if(index<0||index>=30)return {};int p=BOARD+index*28,id=h(r,p+12),flags=h(r,p+22);if(!(flags&0x8000)||id<1||id>722)return {};
+  if(index<0||index>=30)return {};int p=BOARD+index*28,id=h(r,p+12),flags=h(r,p+22);if(!(flags&0x8000)||id<1||id>data.cardCount)return {};
   Card c;c.id=id;c.record=index;c.col=col;c.flags=flags;c.atk=clamp(s(r,p+14)+s(r,p+18)+s(r,p+20),r,false);c.def=clamp(s(r,p+16)+s(r,p+18)+s(r,p+20),r,true);c.star=star(id,(flags&0x200)?1:0,r);return c;
  }
  std::optional<Card> grid(const Bytes& r,int row,int col)const{return record(r,b(r,0x907d8+owner*20+row*5+col),col);}
@@ -63,7 +63,7 @@ public:
   auto enemies=row(r,1);p.star=bestStar(p.result,p.atk,p.def,enemies,r);p.defend=shouldDefend(p.result,p.atk,p.star,enemies,r);return p;
  }
  std::optional<Plan> choose(const DuelView& v,const Bytes& r){
-  auto enemies=row(r,1);std::optional<Plan> best;auto pairs=GameData::decodeFusions(Bytes(r.begin()+0x17c2d8,r.begin()+0x18c2d8));
+  auto enemies=row(r,1);std::optional<Plan> best;auto pairs=GameData::decodeFusions(Bytes(r.begin()+0x17c2d8,r.begin()+0x18c2d8),data.fusionCount);
   for(const auto& f:v.rows)if(type(f.result,r)<20){auto p=withEquips(monster(f.result,f.slots,f.atk,f.def,true,enemies,r),v,r,pairs);if(!best||p.atk>best->atk||(p.atk==best->atk&&p.def>best->def)||(p.atk==best->atk&&p.def==best->def&&p.slots.size()<best->slots.size()))best=p;}
   if(best)return best;if(!v.prefix.empty())return {};
   for(const auto& hand:v.hand)if(type(hand.id,r)==23)for(const auto& c:row(r,2))if(!pairs.count(GameData::pairKey(hand.id,c.id))&&equips(hand.id,c.id,r)){

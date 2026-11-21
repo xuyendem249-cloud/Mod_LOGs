@@ -1,7 +1,7 @@
 #include "FusionAdvisor.hpp"
 #include <algorithm>
 namespace Legend {
-DuelView FusionAdvisor::inspect(const Bytes& ram){
+DuelView FusionAdvisor::inspect(const Bytes& ram,int cardCount){
  DuelView v;if(ram.size()!=0x200000)return v;
  v.duel=(ram[0x9b26c]&31)==3&&ram[0x9b26e]==0x81;if(!v.duel)return v;
  v.npc=ram[0x9b361];v.terrain=ram[0x9b364];v.side=ram[0x9b1d5];
@@ -13,7 +13,7 @@ DuelView FusionAdvisor::inspect(const Bytes& ram){
   int h=0xea030+12*i;uint32_t pointer=u32(ram,h);if(!pointer)continue;
   unsigned obj=pointer&0x1fffff;if(obj<0x10000||obj>=0x1fff80)return {};
   int record=ram[obj+0x6a];if(record>=30)return {};
-  int at=0x1a7ad8+record*28,card=u16(ram,at+12);if(card<1||card>722||!(u16(ram,at+22)&0x8000))return {};
+  int at=0x1a7ad8+record*28,card=u16(ram,at+12);if(card<1||card>cardCount||!(u16(ram,at+22)&0x8000))return {};
   v.hand.push_back({i,card,record,int(int16_t(u16(ram,obj+0x30))),int(int16_t(u16(ram,obj+0x32)))});
   if(u32(ram,h+4)){int order=ram[h+9];if(order<1||order>5||prefix.count(order))return {};prefix[order]=i;}
  }
@@ -32,13 +32,13 @@ FusionAdvisor::Rules FusionAdvisor::rules(const Bytes* ram)const{
  Rules out;if(!recognized(ram))return out;const size_t at=0x1d09e4;
  bool live=ram&&ram->size()>=at+34&&!std::all_of(ram->begin()+at,ram->begin()+at+34,[](uint8_t b){return !b;});
  Bytes table=live?Bytes(ram->begin()+at,ram->begin()+at+34):data.block(0x801d09e4,34);
- for(int i=0;i<17;i++){int entry=u16(table,i*2),card=entry&1023,attr=entry>>10;if(card<1||card>722||attr>=6)return {};out[card]={attr,card==356?0:1};}return out;
+ for(int i=0;i<17;i++){int entry=u16(table,i*2),card=entry&1023,attr=entry>>10;if(card<1||card>data.cardCount||attr>=6)return {};out[card]={attr,card==356?0:1};}return out;
 }
 FusionRow FusionAdvisor::score(int card,const std::vector<int>& route,const DuelView& v,const Bytes* ram,const Rules& rules)const{
  FusionRow row;row.result=card;row.slots=route;
  const HandCard* source=nullptr;if(!route.empty())for(const auto& h:v.hand)if(h.slot==route[0])source=&h;
  auto rule=rules.find(card);
- if(source&&rule!=rules.end()){int col=source->record-v.side*15;if(col>=0&&col<5){int count=0;bool valid=true;for(int i=0;i<5;i++){int id=i==col?card:v.records[i];if(id<0||id>722){valid=false;break;}if(data.attribute(id,ram)==rule->second[0])count++;}if(valid)row.bonus=(count-rule->second[1])*500;}}
+ if(source&&rule!=rules.end()){int col=source->record-v.side*15;if(col>=0&&col<5){int count=0;bool valid=true;for(int i=0;i<5;i++){int id=i==col?card:v.records[i];if(id<0||id>data.cardCount){valid=false;break;}if(data.attribute(id,ram)==rule->second[0])count++;}if(valid)row.bonus=(count-rule->second[1])*500;}}
  auto stats=data.stats(card,v.terrain,row.bonus,ram),base=data.stats(card,0,row.bonus,ram);row.atk=stats[0];row.def=stats[1];row.baseAtk=base[0];row.baseDef=base[1];return row;
 }
 bool FusionAdvisor::stronger(const FusionRow& a,const FusionRow& b){if(a.atk!=b.atk)return a.atk>b.atk;if(a.def!=b.def)return a.def>b.def;return a.slots<b.slots;}
@@ -56,5 +56,5 @@ void FusionAdvisor::rank(DuelView& v,const FusionMap& pairs,const Bytes* ram){
  v.rows.clear();for(auto& entry:current)v.rows.push_back(std::move(entry.second));
  std::sort(v.rows.begin(),v.rows.end(),[](const FusionRow& a,const FusionRow& b){if(a.atk!=b.atk)return a.atk>b.atk;if(a.def!=b.def)return a.def>b.def;if(a.slots.size()!=b.slots.size())return a.slots.size()<b.slots.size();if(a.result!=b.result)return a.result<b.result;return a.slots<b.slots;});
 }
-DuelView FusionAdvisor::analyze(const Bytes& ram){auto v=inspect(ram);if(v.active)rank(v,GameData::decodeFusions(Bytes(ram.begin()+0x17c2d8,ram.begin()+0x18c2d8)),&ram);return v;}
+DuelView FusionAdvisor::analyze(const Bytes& ram){auto v=inspect(ram,data.cardCount);if(v.active)rank(v,GameData::decodeFusions(Bytes(ram.begin()+0x17c2d8,ram.begin()+0x18c2d8),data.fusionCount),&ram);return v;}
 }

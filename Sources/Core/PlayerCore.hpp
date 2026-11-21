@@ -41,6 +41,9 @@ public:
   std::vector<uint8_t> memoryCard();
   bool setMemoryCard(const std::vector<uint8_t>& bytes);
   std::vector<uint8_t> ramSnapshot();
+  uint8_t readRamByte(size_t offset);
+  void writeRam(size_t offset,const std::vector<uint8_t>& bytes);
+  void runTransactionFrames(unsigned count,uint16_t mask);
   void reset();
   void setSpeed(double value){speed=value>=1&&value<=4?value:1;audioPosition=0;audio.clear();}
   double playbackRate()const{return speed;}

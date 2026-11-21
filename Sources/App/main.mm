@@ -11,6 +11,9 @@
 #include "CompatibilityTables.hpp"
 #include "ControllerGeometry.hpp"
 #include "AutoPlayer.hpp"
+#include "FusionSelection.hpp"
+#include "CoreTransaction.hpp"
+#include "DeckTransfer.hpp"
 
 static UIColor* Gold(){return LGGold();}
 static UIColor* Ink(){return LGInk();}
@@ -31,15 +34,13 @@ static NSError* Failure(NSString* text){return [NSError errorWithDomain:LGErrorD
 - (void)up{if(self.change)self.change(NO);}
 - (void)setHighlighted:(BOOL)value{[super setHighlighted:value];self.backgroundColor=value?[UIColor colorWithRed:.38 green:.28 blue:.38 alpha:1]:[UIColor colorWithRed:.15 green:.13 blue:.24 alpha:1];self.layer.borderWidth=value?3:1.4;[self setNeedsDisplay];}
 - (void)drawRect:(CGRect)rect {
- [super drawRect:rect];NSInteger key=self.padID;if(key<0||key>=10)return;
+ [super drawRect:rect];NSInteger key=self.padID;if(key<0||key>=10||key==2||key==3)return;
  CGContextRef c=UIGraphicsGetCurrentContext();CGFloat cx=CGRectGetMidX(self.bounds),cy=CGRectGetMidY(self.bounds),r=MIN(rect.size.width,rect.size.height)*.23;
  UIColor* color=key==0?[UIColor colorWithRed:.5 green:.73 blue:1 alpha:1]:key==1?[UIColor colorWithRed:.85 green:.59 blue:.85 alpha:1]:key==8?[UIColor colorWithRed:1 green:.52 blue:.57 alpha:1]:key==9?[UIColor colorWithRed:.55 green:.88 blue:.64 alpha:1]:Gold();
  CGContextSetStrokeColorWithColor(c,color.CGColor);CGContextSetFillColorWithColor(c,color.CGColor);CGContextSetLineWidth(c,MAX(2,r*.15));CGContextSetLineJoin(c,kCGLineJoinRound);
  switch(key){
  case 0:CGContextMoveToPoint(c,cx-r,cy-r);CGContextAddLineToPoint(c,cx+r,cy+r);CGContextMoveToPoint(c,cx+r,cy-r);CGContextAddLineToPoint(c,cx-r,cy+r);break;
  case 1:CGContextStrokeRect(c,CGRectMake(cx-r,cy-r,r*2,r*2));return;
- case 2:CGContextFillRect(c,CGRectMake(cx-r,cy-2,r*2,4));return;
- case 3:CGContextMoveToPoint(c,cx-r*.65,cy-r);CGContextAddLineToPoint(c,cx+r,cy);CGContextAddLineToPoint(c,cx-r*.65,cy+r);CGContextClosePath(c);break;
  case 8:CGContextStrokeEllipseInRect(c,CGRectMake(cx-r,cy-r,r*2,r*2));return;
  case 9:CGContextMoveToPoint(c,cx,cy-r);CGContextAddLineToPoint(c,cx+r,cy+r*.8);CGContextAddLineToPoint(c,cx-r,cy+r*.8);CGContextClosePath(c);break;
  default:{CGFloat dx=key==6?-1:key==7?1:0,dy=key==4?-1:key==5?1:0;CGContextMoveToPoint(c,cx+dx*r,cy+dy*r);CGContextAddLineToPoint(c,cx-dx*r-dy*r*.75,cy-dy*r+dx*r*.75);CGContextAddLineToPoint(c,cx-dx*r+dy*r*.75,cy-dy*r-dx*r*.75);CGContextClosePath(c);CGContextFillPath(c);return;}
@@ -72,14 +73,20 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  UIImageView* _screen;
  LGAutoButton* _logo;
  UIButton* _speedButton;
+ UIButton* _sound;
+ UIButton* _mode;
+ UILabel* _speedBadge;
+ UIView* _bezel;
  std::atomic<bool> _autoEnabled;
+ std::atomic<bool> _transactionCancelled;
  std::atomic<uint64_t> _autoGeneration;
  uint64_t _autoFrame;
  std::shared_ptr<Legend::GameData> _autoData;
  std::unique_ptr<Legend::FusionAdvisor> _autoAdvisor;
  std::unique_ptr<Legend::AutoPlayer> _auto;
+ std::unique_ptr<Legend::FusionSelection> _fusionSelection;
+ uint64_t _fusionTicket,_fusionFrame;
  UILabel* _placeholder;
- UIView* _toolbar;
  UIButton* _menu;
  UIButton* _save;
  UIButton* _load;
@@ -94,9 +101,9 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  dispatch_queue_t _analysis;
  NSInteger _fusionMode,_slot,_pickMode;
  NSUInteger _generation;
- double _speed,_frameDebt,_lastSnapshot,_lastCardFlush;
+ double _speed,_boostSpeed,_frameDebt,_lastSnapshot,_lastCardFlush;
  float _volume;
- UIButton* _fusion;
+ BOOL _muted,_controllerEnabled;
  LGFusionOverlay* _overlay;
  UITableView* _guide;
  LGDirectionPad* _dpad;
@@ -112,32 +119,57 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (BOOL)prefersHomeIndicatorAutoHidden{return YES;}
 - (void)viewDidLoad {
  [super viewDidLoad];self.view=[[LGBackdrop alloc]initWithFrame:self.view.bounds];self.view.multipleTouchEnabled=YES;
- _autoEnabled.store(false);_autoGeneration.store(0);_autoFrame=0;
+ _autoEnabled.store(false);_transactionCancelled.store(false);_autoGeneration.store(0);_autoFrame=0;
  UIApplication.sharedApplication.idleTimerDisabled=YES;
  _core=std::make_unique<Legend::PlayerCore>();_worker=dispatch_queue_create("vn.anhchugia35.legend.core",DISPATCH_QUEUE_SERIAL);_fps=59.94;_sampleRate=44100;
  _analysis=dispatch_queue_create("vn.anhchugia35.legend.analysis",DISPATCH_QUEUE_SERIAL);
- NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=Legend::validPlaybackSpeed([prefs doubleForKey:@"speed"]);_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
+ NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
+ _controllerEnabled=[prefs objectForKey:@"gamepad_enabled"]?[prefs boolForKey:@"gamepad_enabled"]:YES;
  NSString* docs=NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES).firstObject;_root=[docs stringByAppendingPathComponent:@"Legend"];
  for(NSString* name in @[@"system",@"saves",@"content"]) [[NSFileManager defaultManager] createDirectoryAtPath:[_root stringByAppendingPathComponent:name] withIntermediateDirectories:YES attributes:nil error:nil];
+ _bezel=[[UIView alloc]init];_bezel.backgroundColor=[UIColor colorWithWhite:.02 alpha:1];
+ _bezel.layer.borderColor=[Gold() colorWithAlphaComponent:.65].CGColor;_bezel.layer.borderWidth=1;
+ _bezel.userInteractionEnabled=NO;[self.view addSubview:_bezel];
  _screen=[[UIImageView alloc]init];_screen.backgroundColor=UIColor.blackColor;_screen.contentMode=UIViewContentModeScaleToFill;_screen.layer.magnificationFilter=kCAFilterNearest;_screen.clipsToBounds=YES;[self.view addSubview:_screen];
- _placeholder=[[UILabel alloc]init];_placeholder.text=@"LEGEND\n\nMở menu ☰ để nhập BIOS và chọn game\nLegend Player iOS 0.3.3";_placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
+ _placeholder=[[UILabel alloc]init];_placeholder.text=@"Mở menu để nhập BIOS và chọn game";_placeholder.textColor=Gold();_placeholder.font=[UIFont systemFontOfSize:16 weight:UIFontWeightMedium];_placeholder.numberOfLines=0;_placeholder.textAlignment=NSTextAlignmentCenter;[_screen addSubview:_placeholder];
  _welcome=[[UIImageView alloc]initWithImage:[UIImage imageNamed:@"welcome.png"]];_welcome.contentMode=UIViewContentModeScaleAspectFit;[_screen addSubview:_welcome];
  _overlay=[[LGFusionOverlay alloc]init];[_screen addSubview:_overlay];
  _guide=[[UITableView alloc]initWithFrame:CGRectZero style:UITableViewStylePlain];_guide.dataSource=self;_guide.delegate=self;_guide.backgroundColor=Ink();_guide.rowHeight=UITableViewAutomaticDimension;_guide.estimatedRowHeight=100;_guide.separatorColor=[Gold()colorWithAlphaComponent:.3];[self.view addSubview:_guide];
- _toolbar=[[UIView alloc]init];[self.view addSubview:_toolbar];
- _menu=[self tool:@"☰" action:@selector(menu)];_menu.accessibilityLabel=@"Menu";_save=[self tool:@"Lưu" action:@selector(save)];_load=[self tool:@"Tải" action:@selector(load)];_fusion=[self tool:@"Fusion" action:@selector(cycleFusion)];_fusion.titleLabel.font=[UIFont boldSystemFontOfSize:11];
+ _menu=[self tool:@"line.3.horizontal" label:@"Menu Legend" action:@selector(menu)];
+ _save=[self tool:@"square.and.arrow.down" label:@"Lưu nhanh" action:@selector(save)];
+ _load=[self tool:@"doc.text.magnifyingglass" label:@"Tải nhanh" action:@selector(load)];
+ _sound=[self tool:@"speaker.wave.2" label:@"Âm thanh game" action:@selector(toggleSound)];
+ _mode=[[LGPadButton alloc]init];[_mode setTitle:@"MODE" forState:UIControlStateNormal];_mode.titleLabel.font=[UIFont boldSystemFontOfSize:12];
+ [_mode addTarget:self action:@selector(toggleController) forControlEvents:UIControlEventTouchUpInside];
+ _mode.accessibilityLabel=@"Nhận tay cầm";[self.view addSubview:_mode];[self updateModeButton];
  _logo=[[LGAutoButton alloc]initWithFrame:CGRectZero];[_logo addTarget:self action:@selector(toggleAuto) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_logo];
- _speedButton=[[LGPadButton alloc]init];_speedButton.accessibilityLabel=@"Tốc độ";[_speedButton addTarget:self action:@selector(chooseSpeed) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:_speedButton];
+ _speedButton=[self tool:@"forward.fill" label:@"Tốc độ game" action:@selector(toggleSpeed)];
+ _speedBadge=[[UILabel alloc]init];_speedBadge.font=[UIFont boldSystemFontOfSize:9];_speedBadge.textColor=Gold();_speedBadge.textAlignment=NSTextAlignmentCenter;_speedBadge.hidden=YES;_speedBadge.userInteractionEnabled=NO;[self.view addSubview:_speedBadge];
+ _speedButton.accessibilityValue=@"1×";
+ [_speedButton addGestureRecognizer:[[UILongPressGestureRecognizer alloc]initWithTarget:self action:@selector(speedHeld:)]];
  _pads=[NSMutableDictionary dictionary];NSArray* names=@[@"X",@"Vuông",@"Select",@"Start",@"Lên",@"Xuống",@"Trái",@"Phải",@"Tròn",@"Tam giác",@"L1",@"R1",@"L2",@"R2"];
  __weak LGPlayer* weak=self;
- for(NSInteger i=0;i<14;i++){LGPadButton* b=[[LGPadButton alloc]init];b.padID=i;b.accessibilityLabel=names[i];if(i>=10)[b setTitle:names[i] forState:UIControlStateNormal];b.change=^(BOOL down){LGPlayer* owner=weak;if(owner&&owner->_core)[owner button:(unsigned)i down:down source:0];};_pads[@(i)]=b;[self.view addSubview:b];}
+ for(NSInteger i=0;i<14;i++){LGPadButton* b=[[LGPadButton alloc]init];b.padID=i;b.accessibilityLabel=names[i];if(i>=10||i==2||i==3){[b setTitle:[names[i] uppercaseString] forState:UIControlStateNormal];b.titleLabel.font=[UIFont boldSystemFontOfSize:12];}b.change=^(BOOL down){LGPlayer* owner=weak;if(owner&&owner->_core)[owner button:(unsigned)i down:down source:0];};_pads[@(i)]=b;[self.view addSubview:b];}
  _dpad=[[LGDirectionPad alloc]init];_dpad.backgroundColor=UIColor.clearColor;_dpad.changed=^(uint16_t mask){LGPlayer* owner=weak;if(owner){uint16_t next=(owner->_sources[0]&~uint16_t(0xf0))|mask;[owner source:0 mask:next];}};[self.view addSubview:_dpad];
  [[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(controllers) name:GCControllerDidConnectNotification object:nil];[[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(controllers) name:GCControllerDidDisconnectNotification object:nil];[self controllers];
  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(background) name:UIApplicationWillResignActiveNotification object:nil];[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(foreground) name:UIApplicationDidBecomeActiveNotification object:nil];
  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioInterrupted:) name:AVAudioSessionInterruptionNotification object:nil];
  _displayLink=[CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];_displayLink.preferredFrameRateRange=CAFrameRateRangeMake(30,60,60);[_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
 }
-- (UIButton*)tool:(NSString*)title action:(SEL)action{LGPadButton* b=[[LGPadButton alloc]init];[b setTitle:title forState:UIControlStateNormal];[b addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];[_toolbar addSubview:b];return b;}
+- (UIButton*)tool:(NSString*)symbol label:(NSString*)label action:(SEL)action{
+ UIButton* button=[UIButton buttonWithType:UIButtonTypeSystem];
+ button.tintColor=UIColor.whiteColor;
+ button.backgroundColor=[UIColor colorWithWhite:.035 alpha:.72];
+ button.layer.cornerRadius=9;
+ button.layer.borderWidth=.5;
+ button.layer.borderColor=[UIColor colorWithWhite:.7 alpha:.45].CGColor;
+ UIImageSymbolConfiguration* icon=[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
+ [button setImage:[UIImage systemImageNamed:symbol withConfiguration:icon] forState:UIControlStateNormal];
+ button.accessibilityLabel=label;
+ [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+ [self.view addSubview:button];
+ return button;
+}
 - (void)releaseButtons{_sources[0]=_sources[1]=_sources[2]=_combined=0;_core->input.clear();for(LGPadButton* b in _pads.allValues)b.highlighted=NO;}
 - (void)viewDidAppear:(BOOL)animated{[super viewDidAppear:animated];[self becomeFirstResponder];if(!_operation)[self resume];
  if([NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE"] isEqualToString:@"1"]){dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),dispatch_get_main_queue(),^{[self runSmoke];});}
@@ -150,13 +182,16 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (void)viewDidLayoutSubviews {
  [super viewDidLayoutSubviews];CGRect a=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);Legend::ControllerGeometry g(a.size.width,a.size.height,_fusionMode==2);CGPoint o=a.origin;
- _screen.frame=LGRect(g.fittedGame(),o);_guide.frame=LGRect(g.guide,o);_guide.hidden=_fusionMode!=2;_toolbar.frame=LGRect(g.toolbar,o);
- _pads[@10].frame=LGRect(g.shoulder(false,false),o);_pads[@12].frame=LGRect(g.shoulder(false,true),o);_pads[@13].frame=LGRect(g.shoulder(true,false),o);_pads[@11].frame=LGRect(g.shoulder(true,true),o);
+ _bezel.frame=LGRect(g.bezel,o);_bezel.layer.cornerRadius=g.portrait?20:17;
+ _screen.frame=LGRect(g.game,o);_screen.layer.cornerRadius=_fusionMode==2&&!g.portrait?0:16;_guide.frame=LGRect(g.guide,o);_guide.hidden=_fusionMode!=2;
+ _pads[@12].frame=LGRect(g.shoulder(false,false),o);_pads[@10].frame=LGRect(g.shoulder(false,true),o);_pads[@11].frame=LGRect(g.shoulder(true,false),o);_pads[@13].frame=LGRect(g.shoulder(true,true),o);
  [self cluster:LGRect(g.pad(false),o) right:NO];[self cluster:LGRect(g.pad(true),o) right:YES];_dpad.frame=LGRect(g.pad(false),o);
- _pads[@2].frame=LGRect(g.selectStart(false),o);_pads[@3].frame=LGRect(g.selectStart(true),o);_logo.frame=LGRect(g.logo(),o);_speedButton.hidden=!g.portrait;_speedButton.frame=LGRect(g.speed(),o);[_speedButton setTitle:LGText(Legend::playbackSpeedText(_speed)) forState:UIControlStateNormal];_speedButton.accessibilityValue=LGText(Legend::playbackSpeedText(_speed));
+ _pads[@2].frame=LGRect(g.selectStart(false),o);_pads[@3].frame=LGRect(g.selectStart(true),o);_logo.frame=LGRect(g.logo(),o);_mode.frame=LGRect(g.mode(),o);
+ NSArray<UIButton*>* actions=@[_speedButton,_sound,_save,_load];
+ for(size_t i=0;i<actions.count;i++)actions[i].frame=CGRectInset(LGRect(g.quickAction(int(i)),o),3,4);
+ _speedBadge.frame=CGRectMake(CGRectGetMinX(_speedButton.frame),CGRectGetMaxY(_speedButton.frame)-11,_speedButton.frame.size.width,10);
+ _menu.frame=CGRectInset(LGRect(g.menu(),o),4,4);
  _placeholder.frame=CGRectInset(_screen.bounds,20,20);_welcome.frame=CGRectInset(_screen.bounds,10,10);_welcome.hidden=_ready;_overlay.frame=_screen.bounds;_overlay.hidden=_fusionMode==0;
- CGFloat tw=_toolbar.bounds.size.width,th=_toolbar.bounds.size.height,unit=MIN(1,tw/270);_menu.frame=CGRectMake(unit,1,38*unit,th-2);_fusion.frame=CGRectMake(42*unit,1,66*unit,th-2);_load.frame=CGRectMake(tw-51*unit,1,50*unit,th-2);_save.frame=CGRectMake(tw-104*unit,1,50*unit,th-2);_save.titleLabel.font=_load.titleLabel.font=[UIFont systemFontOfSize:12];
- [_fusion setTitle:_fusionMode==0?@"Fusion: Tắt":_fusionMode==1?@"Fusion: Số":@"Fusion: VIP" forState:0];[_fusion setTitleColor:_fusionMode?Gold():UIColor.whiteColor forState:0];_fusion.accessibilityLabel=@[@"Fusion tắt",@"Fusion chỉ đánh số thứ tự",@"Fusion số và bảng hướng dẫn"][_fusionMode];
  _save.enabled=_load.enabled=_ready;_save.alpha=_load.alpha=_ready?1:.4;[self.view setNeedsDisplay];
 }
 
@@ -167,18 +202,75 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  [self setNeedsUpdateOfSupportedInterfaceOrientations];UIWindowScene* scene=self.view.window.windowScene;if(!scene)[UIViewController attemptRotationToDeviceOrientation];[scene requestGeometryUpdateWithPreferences:[[UIWindowSceneGeometryPreferencesIOS alloc]initWithInterfaceOrientations:mask] errorHandler:^(NSError* error){NSLog(@"Smoke orientation: %@",error);}];
  dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),dispatch_get_main_queue(),^{
  [self smokeProgress:@"layout"];[self.view setNeedsLayout];[self.view layoutIfNeeded];BOOL valid=self->_pads.count==14&&self->_screen.frame.size.width>0;for(LGPadButton* b in self->_pads.allValues)valid=valid&&CGRectContainsRect(self.view.bounds,b.frame)&&b.frame.size.width>0&&b.frame.size.height>0;
- BOOL logo=CGRectContainsRect(self->_toolbar.frame,self->_logo.frame);BOOL portrait=self.view.bounds.size.height>self.view.bounds.size.width;
- [self smokeProgress:@"speed 2"];[self setPlaybackSpeed:2];LGSettingsController* settings=[self configuredSettings];[settings loadViewIfNeeded];UITableViewCell* cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];BOOL synced=[self->_speedButton.currentTitle isEqualToString:@"2×"]&&[cell.detailTextLabel.text isEqualToString:@"2×"];
- [self smokeProgress:@"settings speed 3"];settings.speed=3;settings.changed(settings);cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];synced=synced&&[self->_speedButton.currentTitle isEqualToString:@"3×"]&&[cell.detailTextLabel.text isEqualToString:@"3×"];
+ BOOL portrait=self.view.bounds.size.height>self.view.bounds.size.width;
+ BOOL overlay=YES;
+ for(UIButton* action in @[self->_menu,self->_speedButton,self->_sound,self->_save,self->_load]){
+  overlay=overlay&&CGRectContainsRect(self->_screen.frame,action.frame);
+ }
+ [self smokeProgress:@"speed 2"];[self setPlaybackSpeed:2];LGSettingsController* settings=[self configuredSettings];[settings loadViewIfNeeded];UITableViewCell* cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];BOOL synced=[self->_speedButton.accessibilityValue isEqualToString:@"2×"]&&[cell.detailTextLabel.text isEqualToString:@"2×"];
+ [self smokeProgress:@"settings speed 3"];settings.speed=3;settings.changed(settings);cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];synced=synced&&[self->_speedButton.accessibilityValue isEqualToString:@"3×"]&&[cell.detailTextLabel.text isEqualToString:@"3×"];
  [self smokeProgress:@"core speed sync"];__block double coreSpeed=0;dispatch_sync(self->_worker,^{coreSpeed=self->_core->playbackRate();});synced=synced&&std::abs(coreSpeed-3)<.001;
- [self setPlaybackSpeed:1];CGRect safe=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);Legend::ControllerGeometry g(safe.size.width,safe.size.height,false);auto fitted=g.fittedGame();BOOL expanded=portrait||(std::abs(fitted.y)<.01&&std::abs(fitted.bottom()-g.toolbar.y)<.01);
- [self->_logo layoutIfNeeded];BOOL roundLogo=self->_logo.hasCircularImage&&self->_logo.bounds.size.width>=44;self->_logo.running=YES;BOOL ringStarted=self->_logo.hasRunningAnimation&&self->_logo.currentImage!=nil;[self stopAuto];BOOL ringStopped=ringStarted&&!self->_logo.running&&!self->_logo.hasRunningAnimation;
- [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"approved_background_loaded":@([(LGBackdrop*)self.view hasApprovedArtwork]),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"logo_in_toolbar":@(logo),@"speed_text_sync":@(synced),@"speed_button_visibility":@(self->_speedButton.hidden==landscape),@"speed_button_inside_safe_area":@(!portrait||CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"large_circular_logo":@(roundLogo)};
+ [self toggleSpeed];BOOL togglesToNormal=std::abs(self->_speed-1)<.001;
+ [self toggleSpeed];BOOL togglesToBoost=std::abs(self->_speed-3)<.001;
+ [self setPlaybackSpeed:1];CGRect safe=UIEdgeInsetsInsetRect(self.view.bounds,self.view.safeAreaInsets);BOOL expanded=portrait||std::abs(self->_screen.frame.size.height-safe.size.height)<9;
+ [self->_logo layoutIfNeeded];BOOL roundLogo=self->_logo.hasCircularImage&&CGRectContainsRect(safe,self->_logo.frame);self->_logo.running=YES;BOOL ringStarted=self->_logo.hasRunningAnimation&&self->_logo.currentImage!=nil;[self stopAuto];BOOL ringStopped=ringStarted&&!self->_logo.running&&!self->_logo.hasRunningAnimation;
+ [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"approved_background_loaded":@([(LGBackdrop*)self.view hasApprovedArtwork]),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo)};
  NSData* json=[NSJSONSerialization dataWithJSONObject:report options:0 error:nil];[json writeToFile:[self->_root stringByAppendingPathComponent:[NSString stringWithFormat:@"simulator_smoke-%@.json",mode]] atomically:YES];
  });
 }
 
 - (void)stopAuto{_autoEnabled.store(false);_autoGeneration.fetch_add(1);if(_core)_core->autoInput.store(0);_logo.running=NO;}
+- (void)selectFusion:(NSUInteger)index{
+ if(!_data||!_ready||_paused||_background||_operation||index>=_duel.rows.size())return;
+ [self stopAuto];
+ [self releaseButtons];
+ auto choice=_duel.rows[index];
+ auto data=_data;
+ auto ticket=_autoGeneration.load();
+ _selected=choice;_hasSelected=YES;
+ [_overlay showView:_duel row:&_selected];
+ [_guide reloadData];
+ dispatch_async(_worker,^{
+  if(ticket!=self->_autoGeneration.load()||!self->_core->isLoaded())return;
+  try{
+   Legend::FusionAdvisor advisor(*data,Legend::defaultCompatibility().handSignatures);
+   auto view=advisor.analyze(self->_core->ramSnapshot());
+   for(const auto& row:view.rows){
+    if(row.result!=choice.result||row.slots!=choice.slots)continue;
+    auto selection=std::make_unique<Legend::FusionSelection>(view,row,data->cardCount);
+    if(!selection->compatible(view))break;
+    if(ticket!=self->_autoGeneration.load())return;
+    self->_fusionSelection=std::move(selection);
+    self->_fusionTicket=ticket;
+    self->_fusionFrame=0;
+    self->_core->autoInput.store(0x10000);
+    return;
+   }
+  }catch(const std::exception& error){NSLog(@"Legend Fusion: %s",error.what());}
+  dispatch_async(dispatch_get_main_queue(),^{
+   if(ticket==self->_autoGeneration.load())UIAccessibilityPostNotification(
+    UIAccessibilityAnnouncementNotification,@"Tay bài đã đổi. Chọn lại công thức hiện tại.");
+  });
+ });
+}
+- (BOOL)stepFusion{
+ if(!_fusionSelection)return NO;
+ auto ticket=_autoGeneration.load();
+ if(_fusionTicket!=ticket){
+  _fusionSelection.reset();
+  if(!_autoEnabled.load())_core->autoInput.store(0);
+  return NO;
+ }
+ Legend::Bytes snapshot;
+ if(_fusionSelection->needsSnapshot(_fusionFrame))snapshot=_core->ramSnapshot();
+ uint16_t mask=_fusionSelection->next(snapshot,_fusionFrame++);
+ if(ticket==_autoGeneration.load())_core->setAutoMask(mask);
+ if(_fusionSelection->done){
+  _core->autoInput.store(0);
+  _fusionSelection.reset();
+ }
+ return YES;
+}
 - (void)toggleAuto{
  if(_autoEnabled.load()){[self stopAuto];return;}if(!_ready||_paused||_background||_operation||!_data){[self alert:@"Auto" text:@"Mở game được hỗ trợ trước khi bật Auto."];return;}
  auto data=_data;uint64_t ticket=_autoGeneration.fetch_add(1)+1;_autoEnabled.store(true);_logo.running=YES;[self releaseButtons];
@@ -188,7 +280,38 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   if(ticket==self->_autoGeneration.load()&&self->_autoEnabled.load())self->_core->autoInput.store(0x10000);
  });
 }
-- (void)setPlaybackSpeed:(double)value{_speed=Legend::validPlaybackSpeed(value);[NSUserDefaults.standardUserDefaults setDouble:_speed forKey:@"speed"];[_speedButton setTitle:LGText(Legend::playbackSpeedText(_speed)) forState:UIControlStateNormal];_speedButton.accessibilityValue=LGText(Legend::playbackSpeedText(_speed));double speed=_speed;dispatch_async(_worker,^{self->_core->setSpeed(speed);});}
+- (void)setPlaybackSpeed:(double)value{
+ _speed=Legend::validPlaybackSpeed(value);
+ if(_speed>1)_boostSpeed=_speed;
+ _speedBadge.hidden=_speed<=1;
+ _speedBadge.text=_speedButton.accessibilityValue=LGText(Legend::playbackSpeedText(_speed));
+ _speedButton.tintColor=_speed>1?Gold():UIColor.whiteColor;
+ _speedButton.imageEdgeInsets=_speed>1?UIEdgeInsetsMake(-6,0,0,0):UIEdgeInsetsZero;
+ double speed=_speed;
+ dispatch_async(_worker,^{self->_core->setSpeed(speed);});
+}
+- (void)toggleSpeed{[self setPlaybackSpeed:_speed<=1?_boostSpeed:1];}
+- (void)speedHeld:(UILongPressGestureRecognizer*)gesture{
+ if(gesture.state==UIGestureRecognizerStateBegan)[self chooseSpeed];
+}
+- (void)toggleSound{
+ _muted=!_muted;
+ _audioEngine.mainMixerNode.outputVolume=_muted?0:_volume;
+ _sound.accessibilityValue=_muted?@"Đang tắt":@"Đang bật";
+ _sound.tintColor=_muted?Gold():UIColor.whiteColor;
+ UIImageSymbolConfiguration* icon=[UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightMedium];
+ [_sound setImage:[UIImage systemImageNamed:_muted?@"speaker.slash":@"speaker.wave.2" withConfiguration:icon] forState:UIControlStateNormal];
+}
+- (void)updateModeButton{
+ _mode.accessibilityValue=_controllerEnabled?@"Đang bật":@"Đang tắt";
+ [_mode setTitleColor:_controllerEnabled?Gold():UIColor.whiteColor forState:UIControlStateNormal];
+}
+- (void)toggleController{
+ _controllerEnabled=!_controllerEnabled;
+ [NSUserDefaults.standardUserDefaults setBool:_controllerEnabled forKey:@"gamepad_enabled"];
+ if(!_controllerEnabled)[self source:1 mask:0];
+ [self updateModeButton];
+}
 - (void)chooseSpeed{
  [self pause];UIAlertController* sheet=[UIAlertController alertControllerWithTitle:@"Tốc độ" message:nil preferredStyle:UIAlertControllerStyleActionSheet];__weak LGPlayer* weak=self;
  for(double speed:Legend::playbackSpeeds){NSString* title=LGText(Legend::playbackSpeedText(speed));if(std::abs(speed-_speed)<.001)title=[title stringByAppendingString:@" ✓"];[sheet addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak setPlaybackSpeed:speed];[weak resumePlayback];}]];}
@@ -197,12 +320,22 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 
 - (void)alert:(NSString*)title text:(NSString*)text{UIAlertController* a=[UIAlertController alertControllerWithTitle:title message:text preferredStyle:UIAlertControllerStyleAlert];__weak LGPlayer* weak=self;[a addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[weak resumePlayback];}]];[self presentViewController:a animated:YES completion:nil];}
 - (void)menu {
- [self pause];UIAlertController* a=[UIAlertController alertControllerWithTitle:@"Legend Player" message:nil preferredStyle:UIAlertControllerStyleActionSheet];__weak LGPlayer* weak=self;
+ [self pause];UIAlertController* a=[UIAlertController alertControllerWithTitle:@"Yu-Gi-Oh! FM: Legend" message:nil preferredStyle:UIAlertControllerStyleActionSheet];__weak LGPlayer* weak=self;
  [a addAction:[UIAlertAction actionWithTitle:@"Mở game ISO / BIN / IMG" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak pick:NO];}]];
- [a addAction:[UIAlertAction actionWithTitle:@"VIP · Deck / Drop / Fusion" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak showVIP];}]];
- [a addAction:[UIAlertAction actionWithTitle:@"Cấu hình" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak settings];}]];
+ [a addAction:[UIAlertAction actionWithTitle:@"VIP" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak vipMenu];}]];
+ [a addAction:[UIAlertAction actionWithTitle:@"Cài Đặt" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak settings];}]];
  [a addAction:[UIAlertAction actionWithTitle:@"Tiếp tục" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[weak resumePlayback];}]];
  a.popoverPresentationController.sourceView=_menu;a.popoverPresentationController.sourceRect=_menu.bounds;[self presentViewController:a animated:YES completion:nil];
+}
+- (void)vipMenu{
+ UIAlertController* sheet=[UIAlertController alertControllerWithTitle:@"VIP" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+ __weak LGPlayer* weak=self;
+ [sheet addAction:[UIAlertAction actionWithTitle:@"Deck/DropList" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak showVIP];}]];
+ [sheet addAction:[UIAlertAction actionWithTitle:@"Chest / Deck" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak showCollection];}]];
+ [sheet addAction:[UIAlertAction actionWithTitle:@"Hướng dẫn Fusion" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){[weak cycleFusion];[weak resumePlayback];}]];
+ [sheet addAction:[UIAlertAction actionWithTitle:@"Đóng" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action){[weak resumePlayback];}]];
+ sheet.popoverPresentationController.sourceView=_menu;sheet.popoverPresentationController.sourceRect=_menu.bounds;
+ [self presentViewController:sheet animated:YES completion:nil];
 }
 
 - (void)pick:(BOOL)bios{_pickMode=bios?1:0;[self pickMode:_pickMode];}
@@ -256,7 +389,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (void)pause{[self stopAuto];_paused=YES;_clock=0;[self releaseButtons];[_audioEngine pause];_core->audio.clear();}
 - (void)resume{if(self.presentedViewController)return;[self resumePlayback];}
 - (void)resumePlayback{if(!_ready||_background||_operation)return;_paused=NO;_clock=0;_frameDebt=0;NSError* error=nil;if(!_audioEngine)[self startAudio:&error];else [_audioEngine startAndReturnError:&error];if(error)NSLog(@"Legend audio: %@",error);}
-- (void)background{_background=YES;[self pause];dispatch_async(_worker,^{[self persistCard];});}
+- (void)background{_background=YES;_transactionCancelled.store(true);[self pause];dispatch_async(_worker,^{[self persistCard];});}
 - (void)foreground{_background=NO;[self resume];}
 - (void)audioInterrupted:(NSNotification*)note{NSNumber* type=note.userInfo[AVAudioSessionInterruptionTypeKey];if(type.unsignedIntegerValue==AVAudioSessionInterruptionTypeBegan)[self pause];else [self resume];}
 - (void)startAudio:(NSError**)error {
@@ -265,10 +398,10 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _audioSource=[[AVAudioSourceNode alloc]initWithFormat:format renderBlock:^OSStatus(BOOL* silence,const AudioTimeStamp* timestamp,AVAudioFrameCount frames,AudioBufferList* buffers){
   if(buffers->mNumberBuffers!=2||!buffers->mBuffers[0].mData||!buffers->mBuffers[1].mData){for(UInt32 i=0;i<buffers->mNumberBuffers;i++)if(buffers->mBuffers[i].mData)memset(buffers->mBuffers[i].mData,0,buffers->mBuffers[i].mDataByteSize);*silence=YES;return noErr;}
   ring->render(static_cast<float*>(buffers->mBuffers[0].mData),static_cast<float*>(buffers->mBuffers[1].mData),frames);*silence=NO;return noErr;
- }];[_audioEngine attachNode:_audioSource];[_audioEngine connect:_audioSource to:_audioEngine.mainMixerNode format:format];_audioEngine.mainMixerNode.outputVolume=_volume;[_audioEngine startAndReturnError:error];
+ }];[_audioEngine attachNode:_audioSource];[_audioEngine connect:_audioSource to:_audioEngine.mainMixerNode format:format];_audioEngine.mainMixerNode.outputVolume=_muted?0:_volume;[_audioEngine startAndReturnError:error];
 }
 - (void)source:(unsigned)source mask:(uint16_t)mask{
- if(source>=3)return;if(mask&~_sources[source])[self stopAuto];if(_paused||_background||!_ready)mask=0;_sources[source]=mask;uint16_t next=_sources[0]|_sources[1]|_sources[2];for(unsigned i=0;i<14;i++)if((next^_combined)&(1<<i)){_core->input.button(i,(next&(1<<i))!=0);_pads[@(i)].highlighted=(next&(1<<i))!=0;}_combined=next;
+ if(source>=3)return;if(source==1&&!_controllerEnabled)mask=0;if(mask&~_sources[source])[self stopAuto];if(_paused||_background||!_ready)mask=0;_sources[source]=mask;uint16_t next=_sources[0]|_sources[1]|_sources[2];for(unsigned i=0;i<14;i++)if((next^_combined)&(1<<i)){_core->input.button(i,(next&(1<<i))!=0);_pads[@(i)].highlighted=(next&(1<<i))!=0;}_combined=next;
 }
 - (void)button:(unsigned)id down:(BOOL)down source:(unsigned)source{if(source<3&&id<14)[self source:source mask:down?(_sources[source]|(1<<id)):(_sources[source]&~(1<<id))];}
 - (void)controllers{
@@ -279,7 +412,21 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 }
 - (BOOL)canBecomeFirstResponder{return YES;}
 - (int)keyID:(UIKey*)key{switch(key.keyCode){case UIKeyboardHIDUsageKeyboardW:case UIKeyboardHIDUsageKeyboardUpArrow:return 4;case UIKeyboardHIDUsageKeyboardS:case UIKeyboardHIDUsageKeyboardDownArrow:return 5;case UIKeyboardHIDUsageKeyboardA:case UIKeyboardHIDUsageKeyboardLeftArrow:return 6;case UIKeyboardHIDUsageKeyboardD:case UIKeyboardHIDUsageKeyboardRightArrow:return 7;case UIKeyboardHIDUsageKeyboardK:return 0;case UIKeyboardHIDUsageKeyboardL:return 8;case UIKeyboardHIDUsageKeyboardJ:return 1;case UIKeyboardHIDUsageKeyboardI:return 9;case UIKeyboardHIDUsageKeyboardQ:return 10;case UIKeyboardHIDUsageKeyboardE:return 11;case UIKeyboardHIDUsageKeyboard1:return 12;case UIKeyboardHIDUsageKeyboard3:return 13;case UIKeyboardHIDUsageKeyboardC:return 2;case UIKeyboardHIDUsageKeyboardV:return 3;default:return -1;}}
-- (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event{BOOL handled=NO;for(UIPress* press in presses){if(press.key.keyCode==UIKeyboardHIDUsageKeyboardF1){if(!_paused)[self save];handled=YES;}else if(press.key.keyCode==UIKeyboardHIDUsageKeyboardF3){if(!_paused)[self load];handled=YES;}else{int id=[self keyID:press.key];if(id>=0){[self button:id down:YES source:2];handled=YES;}}}if(!handled)[super pressesBegan:presses withEvent:event];}
+- (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event{
+ BOOL handled=NO;
+ for(UIPress* press in presses){
+  UIKeyboardHIDUsage key=press.key.keyCode;
+  if(key==UIKeyboardHIDUsageKeyboardF11){if(!_paused)[self save];handled=YES;}
+  else if(key==UIKeyboardHIDUsageKeyboardF12){if(!_paused)[self load];handled=YES;}
+  else if(key>=UIKeyboardHIDUsageKeyboardF1&&key<=UIKeyboardHIDUsageKeyboardF10){
+   [self selectFusion:key-UIKeyboardHIDUsageKeyboardF1];handled=YES;
+  }else{
+   int id=[self keyID:press.key];
+   if(id>=0){[self button:id down:YES source:2];handled=YES;}
+  }
+ }
+ if(!handled)[super pressesBegan:presses withEvent:event];
+}
 - (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event{BOOL handled=NO;for(UIPress* press in presses){int id=[self keyID:press.key];if(id>=0){[self button:id down:NO source:2];handled=YES;}}if(!handled)[super pressesEnded:presses withEvent:event];}
 - (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event{[self pressesEnded:presses withEvent:event];}
 - (void)cycleFusion{_fusionMode=(_fusionMode+1)%3;[NSUserDefaults.standardUserDefaults setInteger:_fusionMode forKey:@"fusion_mode"];[self advice:_duel];[self.view setNeedsLayout];}
@@ -294,12 +441,72 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  const auto& r=_duel.rows[path.row];NSString* name=_data?LGText(_data->names[r.result]):@"";cell.textLabel.text=[NSString stringWithFormat:@"%@\n[%03d] %@",LGOrder(r.slots),r.result,name];NSMutableAttributedString* detail=[[NSMutableAttributedString alloc]init];NSString* a=[NSString stringWithFormat:@"ATK %d",r.atk];NSString* d=[NSString stringWithFormat:@" / DEF %d",r.def];[detail appendAttributedString:[[NSAttributedString alloc]initWithString:a attributes:@{NSForegroundColorAttributeName:r.atk>r.baseAtk?UIColor.systemGreenColor:UIColor.whiteColor}]];[detail appendAttributedString:[[NSAttributedString alloc]initWithString:d attributes:@{NSForegroundColorAttributeName:r.def>r.baseDef?UIColor.systemGreenColor:UIColor.whiteColor}]];
  if(r.bonus)[detail appendAttributedString:[[NSAttributedString alloc]initWithString:[NSString stringWithFormat:@"\nHiệu ứng trên tay: %+d A/D",r.bonus]]];if(!r.better.empty())[detail appendAttributedString:[[NSAttributedString alloc]initWithString:[NSString stringWithFormat:@"\nĐổi: %@ (ATK %+d / DEF %+d). Hạ bài đã nâng để chọn lại.",LGOrder(r.better),r.lossAtk,r.lossDef] attributes:@{NSForegroundColorAttributeName:UIColor.systemOrangeColor}]];cell.detailTextLabel.attributedText=detail;cell.accessoryType=_hasSelected&&r.slots==_selected.slots&&r.result==_selected.result?UITableViewCellAccessoryCheckmark:UITableViewCellAccessoryNone;return cell;
 }
-- (void)tableView:(UITableView*)table didSelectRowAtIndexPath:(NSIndexPath*)path{if(path.row<NSInteger(_duel.rows.size())){_selected=_duel.rows[path.row];_hasSelected=YES;[_overlay showView:_duel row:&_selected];[_guide reloadData];}}
+- (void)tableView:(UITableView*)table didSelectRowAtIndexPath:(NSIndexPath*)path{[self selectFusion:path.row];}
 - (CGFloat)tableView:(UITableView*)table heightForRowAtIndexPath:(NSIndexPath*)path{UITableViewCell* cell=[self tableView:table cellForRowAtIndexPath:path];CGFloat width=MAX(30,table.bounds.size.width-44);return MAX(64,24+[cell.textLabel sizeThatFits:CGSizeMake(width,CGFLOAT_MAX)].height+[cell.detailTextLabel sizeThatFits:CGSizeMake(width,CGFLOAT_MAX)].height);}
 - (void)showVIP{[self pause];if(!_data){[self alert:@"VIP" text:@"Mở game có dữ liệu VIP trước. Nếu vừa mở, chờ đọc dữ liệu một lát."];return;}LGVipController* vip=[[LGVipController alloc]initWithData:_data queue:_analysis ram:_lastRam];__weak LGPlayer* weak=self;vip.closed=^{[weak resumePlayback];};[self presentViewController:vip animated:YES completion:nil];}
+- (void)showCollection{
+ [self pause];
+ if(!_ready||!_data||_operation){
+  [self alert:@"Chest / Deck" text:@"Hãy mở game và vào Chest / Build Deck."];
+  return;
+ }
+ auto data=_data;
+ auto generation=_generation;
+ dispatch_async(_worker,^{
+  std::optional<Legend::CollectionSnapshot> snapshot;
+  try{snapshot=Legend::CollectionSnapshot::inspect(self->_core->ramSnapshot(),data->cardCount);}
+  catch(const std::exception& error){NSLog(@"Legend Chest / Deck: %s",error.what());}
+  dispatch_async(dispatch_get_main_queue(),^{
+   if(generation!=self->_generation||self->_background)return;
+   if(!snapshot){
+    [self alert:@"Chest / Deck" text:@"Hãy mở Chest / Build Deck và đợi màn hình ổn định."];
+    return;
+   }
+   LGCollectionController* collection=[[LGCollectionController alloc]initWithData:data snapshot:*snapshot queue:self->_analysis];
+   __weak LGPlayer* weak=self;
+   collection.closed=^{[weak resumePlayback];};
+   collection.applyPlan=^(const Legend::DeckPlan& plan,void(^finished)(NSString*)){
+    [weak applyCollection:*snapshot plan:plan completion:finished];
+   };
+   UINavigationController* navigation=[[UINavigationController alloc]initWithRootViewController:collection];
+   navigation.modalPresentationStyle=UIModalPresentationFullScreen;
+   navigation.overrideUserInterfaceStyle=UIUserInterfaceStyleDark;
+   [self presentViewController:navigation animated:YES completion:nil];
+  });
+ });
+}
+- (void)applyCollection:(const Legend::CollectionSnapshot&)snapshot plan:(const Legend::DeckPlan&)choice
+             completion:(void(^)(NSString*))completion{
+ if(!_ready||_operation||_background){completion(@"Game đang chuyển màn hình.");return;}
+ [self pause];
+ _operation=YES;
+ _transactionCancelled.store(false);
+ Legend::CollectionSnapshot inventory=snapshot;
+ auto cards=choice.cards;
+ dispatch_async(_worker,^{
+  NSString* error=nil;
+  BOOL fatal=NO;
+  try{
+   Legend::CoreTransaction transaction(*self->_core,self->_transactionCancelled);
+   Legend::applyDeck(transaction,inventory,cards);
+  }catch(const Legend::RollbackFailed& problem){
+   self->_gameKey=nil;
+   self->_core->close();
+   error=LGText(problem.what());
+   fatal=YES;
+  }catch(const std::exception& problem){error=LGText(problem.what());}
+  dispatch_async(dispatch_get_main_queue(),^{
+   self->_operation=NO;
+   if(fatal)self->_ready=NO;
+   completion(error);
+   if(!error)UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,
+    @"Đã xếp 40 lá. Thoát Chest / Deck trong game để nhận bộ bài.");
+  });
+ });
+}
 - (LGSettingsController*)configuredSettings{
  LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;__weak LGPlayer* weak=self;
- settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setDouble:s.speed forKey:@"speed"];[p setFloat:s.volume forKey:@"volume"];[owner.view setNeedsLayout];};
+ settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];[owner.view setNeedsLayout];};
  settings.closed=^{[weak resumePlayback];};settings.command=^(NSString* command){[weak command:command];};return settings;
 }
 - (void)settings{
@@ -319,7 +526,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (void)tick:(CADisplayLink*)link {
  if(!_ready||_paused||_background||_inFlight)return;double now=link.timestamp;if(!_clock)_clock=now-1.0/_fps;double elapsed=std::clamp(now-_clock,0.,.1);_clock=now;_frameDebt+=elapsed*_fps*_speed;int count=MIN(8,int(_frameDebt));if(count<1)return;_frameDebt-=count;_inFlight=YES;NSUInteger generation=_generation;BOOL snapshot=!_analyzing&&now-_lastSnapshot>=.15;if(snapshot){_analyzing=YES;_lastSnapshot=now;}
  dispatch_async(_worker,^{BOOL changed=NO;for(int i=0;i<count;i++){
- if(self->_autoEnabled.load()&&self->_auto){uint64_t ticket=self->_autoGeneration.load();Legend::Bytes ram;const Legend::Bytes* snapshot=nullptr;if(self->_autoFrame>=self->_auto->nextDecision&&self->_autoFrame>=self->_auto->releaseAt){ram=self->_core->ramSnapshot();snapshot=&ram;}int mask=self->_auto->next(snapshot,self->_autoFrame++);
+ if(![self stepFusion]&&self->_autoEnabled.load()&&self->_auto){uint64_t ticket=self->_autoGeneration.load();Legend::Bytes ram;const Legend::Bytes* snapshot=nullptr;if(self->_autoFrame>=self->_auto->nextDecision&&self->_autoFrame>=self->_auto->releaseAt){ram=self->_core->ramSnapshot();snapshot=&ram;}int mask=self->_auto->next(snapshot,self->_autoFrame++);
   if(ticket==self->_autoGeneration.load()&&self->_autoEnabled.load()){self->_core->setAutoMask(mask);if(self->_auto->stopped){self->_autoEnabled.store(false);self->_core->autoInput.store(0);dispatch_async(dispatch_get_main_queue(),^{if(ticket==self->_autoGeneration.load()){self->_logo.running=NO;UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,@"Auto đã tắt");}});}}
  }
  changed=self->_core->run()||changed;}UIImage* image=nil;if(changed){auto& f=self->_core->frame;NSData* bytes=[NSData dataWithBytes:f.rgba.data() length:f.rgba.size()];CGDataProviderRef provider=CGDataProviderCreateWithCFData((__bridge CFDataRef)bytes);CGColorSpaceRef space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);CGImageRef cg=CGImageCreate(f.width,f.height,8,32,f.width*4,space,kCGImageAlphaLast|kCGBitmapByteOrder32Big,provider,NULL,NO,kCGRenderingIntentDefault);if(cg){image=[UIImage imageWithCGImage:cg];CGImageRelease(cg);}CGColorSpaceRelease(space);CGDataProviderRelease(provider);}

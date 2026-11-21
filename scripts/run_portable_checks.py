@@ -7,7 +7,7 @@ def main(iso=None,fixture=None):
  if not zig.exists():raise SystemExit('Local Zig compiler is not installed; use the macOS build gate instead.')
  env=dict(os.environ,ZIG_GLOBAL_CACHE_DIR=str(ROOT/'build/zig-cache'));results=[]
  tests=[('frontend_test',[]),('audio_test',[]),('compatibility_test',[]),('geometry_test',[])]
- if iso and fixture:tests.append(('parity_test',['Sources/Core/GameData.cpp','Sources/Core/FusionAdvisor.cpp']))
+ if iso and fixture:tests.append(('parity_test',['Sources/Core/Digest.cpp','Sources/Core/GameData.cpp','Sources/Core/FusionAdvisor.cpp','-lbcrypt']))
  for name,sources in tests:
   output=ROOT/'build'/(name+'.exe');args=[str(zig),'c++','-std=c++17','-O2','-I',str(ROOT/'Sources/Core'),*[str(ROOT/s) for s in sources],str(ROOT/'tests'/(name+'.cpp')),'-o',str(output)]
   subprocess.run(args,env=env,check=True)

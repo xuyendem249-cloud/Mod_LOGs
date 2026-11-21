@@ -33,7 +33,10 @@ def build(sdk):
   run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(include),tests/'core_probe.cpp',combined,'-framework','CoreFoundation','-lobjc','-o',folder/'core_probe']);run([folder/'core_probe',folder/'probe-data'])
   for name in ['compatibility_test','geometry_test','auto_config_test']:
    run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-I'+str(ROOT/'Sources/Core'),tests/(name+'.cpp'),'-o',folder/name]);run([folder/name])
-  run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-fsyntax-only','-I'+str(ROOT/'Sources/Core'),ROOT/'Sources/Core/GameData.cpp',ROOT/'Sources/Core/FusionAdvisor.cpp'])
+  core_sources=('Digest.cpp','GameData.cpp','FusionAdvisor.cpp','CollectionSnapshot.cpp',
+                'DeckPlanner.cpp','DeckTransfer.cpp','Gacha.cpp')
+  run([clang,'-isysroot',sdkroot,'-std=c++17','-arch','arm64','-mmacosx-version-min=11.0','-fsyntax-only',
+       '-I'+str(ROOT/'Sources/Core'),*(ROOT/'Sources/Core'/name for name in core_sources)])
   report['compatibility_guards_passed']=True;report['controller_geometry_passed']=True
   report['auto_policy_helpers_passed']=True
   report['macos_api_probe_passed']=True;report['frontend_tests_passed']=True

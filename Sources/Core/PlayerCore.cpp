@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <cmath>
+#include <stdexcept>
 
 namespace Legend {
 PlayerCore* PlayerCore::active=nullptr;
@@ -62,6 +63,23 @@ bool PlayerCore::loadState(const std::vector<uint8_t>& v){if(!loaded||v.empty()|
 std::vector<uint8_t> PlayerCore::memoryCard(){if(!loaded)return {};auto* p=static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM));size_t n=retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);if(!p||n!=131072)return {};return {p,p+n};}
 bool PlayerCore::setMemoryCard(const std::vector<uint8_t>& v){if(!loaded||v.size()!=131072||retro_get_memory_size(RETRO_MEMORY_SAVE_RAM)!=v.size())return false;void* p=retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);if(!p)return false;memcpy(p,v.data(),v.size());return true;}
 std::vector<uint8_t> PlayerCore::ramSnapshot(){if(!loaded)return {};auto* p=static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM));size_t n=retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM);if(!p||n!=0x200000)return {};return {p,p+n};}
+uint8_t PlayerCore::readRamByte(size_t offset){
+ auto* memory=loaded?static_cast<const uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM)):nullptr;
+ if(!memory||offset>=retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM))throw std::out_of_range("Invalid RAM offset");
+ return memory[offset];
+}
+void PlayerCore::writeRam(size_t offset,const std::vector<uint8_t>& bytes){
+ auto* memory=loaded?static_cast<uint8_t*>(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM)):nullptr;
+ size_t size=memory?retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM):0;
+ if(!memory||offset>size||bytes.size()>size-offset)throw std::out_of_range("Invalid RAM range");
+ std::copy(bytes.begin(),bytes.end(),memory+offset);
+}
+void PlayerCore::runTransactionFrames(unsigned count,uint16_t mask){
+ autoInput.store(0x10000|mask);
+ for(unsigned i=0;i<count;i++)run();
+ autoInput.store(0);
+ audio.clear();
+}
 void PlayerCore::reset(){if(loaded){input.clear();audio.clear();retro_reset();}}
 std::string PlayerCore::coreVersion()const{retro_system_info info{};retro_get_system_info(&info);return std::string(info.library_name?info.library_name:"")+":"+(info.library_version?info.library_version:"");}
 }

@@ -1,6 +1,7 @@
 #pragma once
 #import <UIKit/UIKit.h>
 #include "FusionAdvisor.hpp"
+#include "DeckPlanner.hpp"
 #include "PlaybackSpeed.hpp"
 #include <memory>
 UIColor* LGGold();
@@ -23,6 +24,13 @@ NSAttributedString* LGDescription(Legend::GameData&,int);
 @interface LGVipController:UIViewController<UITableViewDataSource,UITableViewDelegate,UISearchBarDelegate>
 - (instancetype)initWithData:(std::shared_ptr<Legend::GameData>)data queue:(dispatch_queue_t)queue ram:(std::shared_ptr<Legend::Bytes>)ram;
 @property(nonatomic,copy) void(^closed)(void);
+@end
+@interface LGCollectionController:UITableViewController
+- (instancetype)initWithData:(std::shared_ptr<Legend::GameData>)data
+                   snapshot:(const Legend::CollectionSnapshot&)snapshot
+                      queue:(dispatch_queue_t)queue;
+@property(nonatomic,copy) void(^closed)(void);
+@property(nonatomic,copy) void(^applyPlan)(const Legend::DeckPlan& plan,void(^finished)(NSString* error));
 @end
 @interface LGSettingsController:UITableViewController
 @property(nonatomic) NSInteger fusionMode,slot;

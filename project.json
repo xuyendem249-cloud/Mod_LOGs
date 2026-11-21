@@ -1,53 +1,23 @@
 {
-  "name": "Legend Player iOS",
-  "stage": 5,
-  "stage_name": "Larger circular Auto logo; Apple validation pending",
-  "reference_android": "Android 8 / Ver 19 (includes Android 6 / Ver 17 compatibility fixes)",
-  "target_device": "iPhone 14",
-  "target_ios": "17.6.1",
+  "name": "Yu-Gi-Oh! FM: Legend",
+  "version": "0.4.0",
+  "build": 7,
+  "bundle_id": "vn.anhchugia35.legend",
   "minimum_ios": "17.0",
-  "architectures": [
-    "arm64"
-  ],
-  "renderer": "Software",
-  "cpu_execution": "Interpreter",
-  "jit": false,
-  "recording": false,
-  "installable_app_available": false,
-  "step1_core_gate_passed": true,
-  "step1_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39557932135",
-  "native_app_built_with_apple_sdk": false,
-  "step2_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39588712135",
-  "simulator_smoke_passed": false,
-  "unsigned_ipa_available": false,
-  "signed_for_device": false,
-  "testflight_uploaded": false,
+  "android_reference": {
+    "version": 92,
+    "apk_sha256": "c6251f14f282bbf14ea5a89eee339f88bf61e2bc1066a217c2a562cb81b8659e",
+    "disc_sha256": "c2274ec8ed4d755c96afc3307628ba1ec472d76f0d4a5c3ddd21a9cd1d3d4c15"
+  },
+  "windows_checks": {
+    "card_catalog_and_fusion_parity": true,
+    "controller_layout_cases": 126,
+    "collection_and_planner_terrain_parity": 7,
+    "native_deck_transfer_and_rollback": true,
+    "native_gacha_pack_sizes": [1, 5, 10],
+    "native_gacha_save_and_rollback": true
+  },
+  "apple_sdk_build_verified": false,
   "iphone_runtime_tested": false,
-  "vip_fusion_ported": true,
-  "mod_compatibility_patches_ported": true,
-  "intended_distribution": "TestFlight after native iOS app and signing are ready",
-  "version": "0.3.3",
-  "build": 6,
-  "previous_release": {
-    "version": "0.3.2",
-    "apple_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976",
-    "commit": "57d12e00e5ed1fc014cdb7780c52ee0f1eca8464"
-  },
-  "step3_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39609329020",
-  "step3_commit": "81dd741272e869fd005de43dccd8b99c36f0bbb3",
-  "native_effect_replay_passed": true,
-  "approved_background": {
-    "file": "Resources/DuelTemple-v1.png",
-    "approved_by_user": true,
-    "date": "2026-10-22"
-  },
-  "superseded_build_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39649047240",
-  "step4_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39650587896",
-  "step4_commit": "874ecf87ce8127e9aed2537c0409a0864f978bce",
-  "auto_ported": true,
-  "auto_native_trace_matches_android": true,
-  "quick_speed_button": true,
-  "step5_run": "https://github.com/xuyendem249-cloud/Mod_LOGs/actions/runs/39703895976",
-  "step5_commit": "57d12e00e5ed1fc014cdb7780c52ee0f1eca8464",
-  "circular_auto_logo": true
+  "android_feature_parity_verified": false
 }

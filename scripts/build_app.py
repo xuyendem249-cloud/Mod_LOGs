@@ -10,7 +10,10 @@ def main(sdk):
  clang=capture(['xcrun','--sdk',sdk,'--find','clang++'])
  folder=ROOT/'build'/sdk;app=folder/'Legend.app';app.mkdir(exist_ok=True)
  target='arm64-apple-ios17.0'+('-simulator' if sdk=='iphonesimulator' else '')
- sources=[ROOT/'Sources/App/main.mm',ROOT/'Sources/App/LegendViews.mm',ROOT/'Sources/Core/PlayerCore.cpp',ROOT/'Sources/Core/GameData.cpp',ROOT/'Sources/Core/FusionAdvisor.cpp']
+ app_sources=('main.mm','LegendViews.mm')
+ core_sources=('PlayerCore.cpp','Digest.cpp','GameData.cpp','FusionAdvisor.cpp','CollectionSnapshot.cpp',
+               'DeckPlanner.cpp','DeckTransfer.cpp','Gacha.cpp')
+ sources=[*(ROOT/'Sources/App'/name for name in app_sources),*(ROOT/'Sources/Core'/name for name in core_sources)]
  args=[clang,'-target',target,'-isysroot',sdkroot,'-std=c++17','-fobjc-arc','-fblocks','-O2','-g','-Wall','-Wextra','-Wno-unused-parameter','-Wno-deprecated-declarations','-I'+str(ROOT/'Sources/Core'),'-I'+str(ROOT/'vendor/swanstation/dep/libretro-common/include'),*sources,folder/'LegendSwanStation.a','-o',app/'Legend']
  # The direct clang build does not enable Clang module autolinking. Link the
  # CoreGraphics APIs used by main.mm explicitly for device AND simulator.

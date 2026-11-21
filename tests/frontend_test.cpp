@@ -31,6 +31,15 @@ int main(){
     check(before.showTexture()&&after.showTexture()&&before.edgeOpacity()==0&&after.edgeOpacity()==0,"no foil stripes on pack faces");
     check(before.face==halfTurn%3&&after.face==(halfTurn+1)%3&&before.side==-after.side,"pack switches art at the edge");
   }
+  constexpr uint16_t left=1<<6,up=1<<4;
+  for(unsigned button=0;button<14;button++){
+    uint16_t bit=1<<button;
+    check(touchNeedsFeedback(0,bit),"tap produces feedback");
+    check(!touchNeedsFeedback(bit,bit),"held key does not repeat feedback");
+    check(!touchNeedsFeedback(bit,0),"release is silent");
+  }
+  check(touchNeedsFeedback(left,up)&&touchNeedsFeedback(left|up,up),"new direction produces feedback");
+  check(!touchNeedsFeedback(left|1,left),"face key release does not pulse a held direction");
   Input input;for(int i=0;i<1000;i++)input.advance();input.button(0,true);input.button(0,false);check(input.mask()==1,"minimum touch pulse");for(int i=0;i<3;i++)input.advance();check(input.mask()==0,"pulse expires");input.button(4,true);input.button(8,true);check(input.mask()==((1<<4)|(1<<8)),"multitouch");input.clear();check(input.mask()==0,"rotation/background/load clear input");input.button(8,true);input.button(8,false);check(input.mask()==(1<<8),"new key after load");input.button(40,true);input.clear();check(input.mask()==0,"invalid input ignored");
   std::cout<<"PASS: RGBA 32/16-bit primaries, pitch/alpha, invalid frames, multitouch, pulse and input reset\n";
 }

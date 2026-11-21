@@ -122,6 +122,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  CADisplayLink* _displayLink;
  AVAudioEngine* _audioEngine;
  AVAudioSourceNode* _audioSource;
+ UIImpactFeedbackGenerator* _padFeedback;
  UIImageView* _screen;
  LGAutoButton* _logo;
  UIButton* _speedButton;
@@ -189,6 +190,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _analysis=dispatch_queue_create("vn.anhchugia35.legend.analysis",DISPATCH_QUEUE_SERIAL);
  _slotIO=dispatch_queue_create("vn.anhchugia35.legend.slots",DISPATCH_QUEUE_SERIAL);
  _vault=[[LGSaveVault alloc]init];_quickSlots=[[LGQuickSlots alloc]initWithVault:_vault];
+ _padFeedback=[[UIImpactFeedbackGenerator alloc]initWithStyle:UIImpactFeedbackStyleLight];
  NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
  _imageFilter.store(int(std::clamp<NSInteger>([prefs integerForKey:@"filter_mode"],0,2)));
  _renderedFilter=-1;
@@ -251,7 +253,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (BOOL)hasBundledGame{
  return [NSFileManager.defaultManager fileExistsAtPath:[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"mod2/content.sealed"].path];
 }
-- (void)viewDidAppear:(BOOL)animated{[super viewDidAppear:animated];[self becomeFirstResponder];if(!_operation)[self resume];
+- (void)viewDidAppear:(BOOL)animated{[super viewDidAppear:animated];[_padFeedback prepare];[self becomeFirstResponder];if(!_operation)[self resume];
  if([NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE"] isEqualToString:@"1"]){dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),dispatch_get_main_queue(),^{[self runSmoke];});}
  else if(!_triedBundled&&[self hasBundledGame]){
   _triedBundled=YES;
@@ -883,7 +885,22 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  }];[_audioEngine attachNode:_audioSource];[_audioEngine connect:_audioSource to:_audioEngine.mainMixerNode format:format];_audioEngine.mainMixerNode.outputVolume=_muted?0:_volume;[_audioEngine startAndReturnError:error];
 }
 - (void)source:(unsigned)source mask:(uint16_t)mask{
- if(source>=3)return;if(source==1&&!_controllerEnabled)mask=0;if(mask&~_sources[source])[self stopAuto];if(_paused||_background||!_ready)mask=0;_sources[source]=mask;uint16_t next=_sources[0]|_sources[1]|_sources[2];for(unsigned i=0;i<14;i++)if((next^_combined)&(1<<i)){_core->input.button(i,(next&(1<<i))!=0);_pads[@(i)].highlighted=(next&(1<<i))!=0;}_combined=next;
+ if(source>=3)return;
+ if(source==1&&!_controllerEnabled)mask=0;
+ uint16_t previous=_sources[source];
+ if(mask&~previous)[self stopAuto];
+ if(_paused||_background||!_ready)mask=0;
+ if(source==0&&Legend::touchNeedsFeedback(previous,mask)){
+  [_padFeedback impactOccurred];
+  [_padFeedback prepare];
+ }
+ _sources[source]=mask;
+ uint16_t next=_sources[0]|_sources[1]|_sources[2];
+ for(unsigned i=0;i<14;i++)if((next^_combined)&(1<<i)){
+  _core->input.button(i,(next&(1<<i))!=0);
+  _pads[@(i)].highlighted=(next&(1<<i))!=0;
+ }
+ _combined=next;
  _dpad.held=next&0xf0;
 }
 - (void)button:(unsigned)id down:(BOOL)down source:(unsigned)source{if(source<3&&id<14)[self source:source mask:down?(_sources[source]|(1<<id)):(_sources[source]&~(1<<id))];}

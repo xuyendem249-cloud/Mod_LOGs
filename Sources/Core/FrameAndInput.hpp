@@ -43,6 +43,11 @@ struct Frame {
     }
   }
 };
+inline constexpr bool touchNeedsFeedback(uint16_t previous,uint16_t next){
+  constexpr uint16_t directions=0x00f0;
+  return (next&~previous)!=0||((next&directions)!=0&&((previous^next)&directions)!=0);
+}
+
 class Input {
   std::mutex mutex;uint16_t held=0;uint64_t tick=0;std::array<uint64_t,16> until{};
 public:

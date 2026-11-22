@@ -284,7 +284,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  LGBackdrop* deck=(LGBackdrop*)self.view;
  deck.controllerFrame=a;deck.bezelFrame=LGRect(g.bezel,o);deck.bezelRadius=g.portrait?20:17;
  _screen.frame=LGRect(g.game,o);_screen.layer.cornerRadius=g.portrait?19:16;_guide.frame=LGRect(g.guide,o);_guide.hidden=_fusionMode!=2;
- _pads[@12].frame=LGRect(g.shoulder(false,false),o);_pads[@10].frame=LGRect(g.shoulder(false,true),o);_pads[@11].frame=LGRect(g.shoulder(true,false),o);_pads[@13].frame=LGRect(g.shoulder(true,true),o);
+ _pads[@10].frame=LGRect(g.leftShoulder(false),o);_pads[@12].frame=LGRect(g.leftShoulder(true),o);_pads[@11].frame=LGRect(g.shoulder(true,false),o);_pads[@13].frame=LGRect(g.shoulder(true,true),o);
  [self cluster:LGRect(g.pad(false),o) right:NO];[self cluster:LGRect(g.pad(true),o) right:YES];_dpad.frame=LGRect(g.pad(false),o);
  _pads[@2].frame=LGRect(g.selectStart(false),o);_pads[@3].frame=LGRect(g.selectStart(true),o);_logo.frame=LGRect(g.logo(),o);_mode.frame=LGRect(g.mode(),o);
  NSArray<UIButton*>* actions=@[_speedButton,_sound,_save,_load];
@@ -1175,8 +1175,29 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (void)settings{
  [self pause];LGSettingsController* settings=[self configuredSettings];UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:settings];nav.overrideUserInterfaceStyle=UIUserInterfaceStyleDark;nav.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:nav animated:YES completion:nil];
 }
+- (void)showLicense{
+ NSString* path=[NSBundle.mainBundle pathForResource:@"LICENSES" ofType:@"txt"];
+ NSString* text=[NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil]?:@"SwanStation — GPLv3\nMã nguồn: https://github.com/xuyendem249-cloud/Mod_LOGs";
+ NSRange heading=[text rangeOfString:@"GNU GENERAL PUBLIC LICENSE"];
+ if(heading.location!=NSNotFound)text=[text substringFromIndex:[text lineRangeForRange:heading].location];
+
+ UIViewController* vc=[[UIViewController alloc]init];
+ vc.title=@"Giấy phép";
+ UITextView* view=[[UITextView alloc]init];
+ view.text=text;
+ view.editable=NO;
+ view.backgroundColor=Ink();
+ view.textColor=UIColor.whiteColor;
+ view.font=[UIFont systemFontOfSize:13];
+ vc.view=view;
+ vc.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(closeDocument)];
+ UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:vc];
+ nav.modalPresentationStyle=UIModalPresentationFullScreen;
+ [self presentViewController:nav animated:YES completion:nil];
+}
 - (void)command:(NSString*)command{
- if([command isEqualToString:@"bios"]){[self pick:YES];return;}if([command isEqualToString:@"license"]){NSString* path=[NSBundle.mainBundle pathForResource:@"LICENSES" ofType:@"txt"];NSString* text=[NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil]?:@"SwanStation — GPLv3\nMã nguồn: https://github.com/xuyendem249-cloud/Mod_LOGs";UIViewController* vc=[[UIViewController alloc]init];vc.title=@"Mã nguồn & giấy phép";UITextView* view=[[UITextView alloc]init];view.text=text;view.editable=NO;view.backgroundColor=Ink();view.textColor=UIColor.whiteColor;view.font=[UIFont systemFontOfSize:13];vc.view=view;vc.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Đóng" style:UIBarButtonItemStyleDone target:self action:@selector(closeDocument)];UINavigationController* nav=[[UINavigationController alloc]initWithRootViewController:vc];nav.modalPresentationStyle=UIModalPresentationFullScreen;[self presentViewController:nav animated:YES completion:nil];return;}
+ if([command isEqualToString:@"bios"]){[self pick:YES];return;}
+ if([command isEqualToString:@"license"]){[self showLicense];return;}
  if(!_ready){[self alert:@"Chưa mở game" text:@"Hãy mở đúng game trước."];return;}
  if([command isEqualToString:@"reset"])[self confirm:@"Khởi động lại game?" text:@"Thẻ nhớ được lưu trước khi khởi động lại. Tiến trình chưa lưu trong game sẽ mất." action:^{++self->_generation;self->_lastRam.reset();self->_operation=YES;dispatch_async(self->_worker,^{[self persistCard];try{self->_core->reset();self->_needsNativeLoad=true;}catch(const Legend::WalletRejected& failure){[self rejectWallet:LGText(failure.what())];return;}dispatch_async(dispatch_get_main_queue(),^{self->_operation=NO;self->_duel={};self->_hasSelected=NO;[self->_overlay showView:self->_duel row:nullptr];[self resumePlayback];});});}];
 }

@@ -48,11 +48,12 @@ struct ControllerGeometry{
   return {area.x+margin+(second?w+5:0),area.y+8,w,std::min(46.,area.h*(portrait?.17:.15))};
  }
  Box selectStart(bool start)const{
-  if(portrait)return footer(start?1:0);
+  if(portrait)return footer(start?2:1);
   auto area=start?right:left;
   double w=std::min(108.,area.w*.58),h=std::min(42.,area.h*.15);
   return {area.x+(area.w-w)/2,area.bottom()-h-14,w,h};
  }
+ Box leftShoulder(bool trigger)const{return shoulder(false,trigger==portrait);}
  Box pad(bool rhs)const{
   auto area=rhs?right:left;
   double top=shoulder(rhs,false).bottom()+(portrait?10:56);
@@ -67,7 +68,7 @@ struct ControllerGeometry{
   return {area.x+(area.w-size)/2,area.y+(area.h-size)/2,size,size};
  }
  Box mode()const{
-  if(portrait)return footer(2);
+  if(portrait)return footer(0);
   auto select=selectStart(false);
   return {width-select.right(),shoulder(true,false).bottom()+5,select.w,select.h};
  }

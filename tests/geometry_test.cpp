@@ -21,10 +21,18 @@ for(bool guide:{false,true}){
  }
  assert(std::abs(g.quickAction(0).x-game.x-4)<.001);
  assert(std::abs(game.right()-g.quickAction(3).right()-4)<.001);
- if(g.portrait)assert(std::abs(game.x-4)<.001&&std::abs(w-game.right()-4)<.001);
+ auto l1=g.leftShoulder(false),l2=g.leftShoulder(true);
+ auto mode=g.mode(),select=g.selectStart(false),start=g.selectStart(true);
+ if(g.portrait){
+  assert(std::abs(game.x-4)<.001&&std::abs(w-game.right()-4)<.001);
+  assert(mode.right()<=select.x&&select.right()<=start.x&&start.right()<=g.logo().x);
+  assert(mode.y==select.y&&select.y==start.y);
+  assert(l1.right()<=l2.x);
+ }
  else{
   assert(std::abs(h-game.h-8)<.001);
   assert(g.mode().y<g.selectStart(true).y);
+  assert(l2.right()<=l1.x);
  }
  for(bool rhs:{false,true}){
   auto pad=g.pad(rhs),select=g.selectStart(rhs);

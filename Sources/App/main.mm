@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
+#import <CoreHaptics/CoreHaptics.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <QuartzCore/QuartzCore.h>
@@ -123,6 +124,9 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  AVAudioEngine* _audioEngine;
  AVAudioSourceNode* _audioSource;
  UIImpactFeedbackGenerator* _padFeedback;
+ CHHapticEngine* _padHapticEngine;
+ id<CHHapticPatternPlayer> _padHapticPlayer;
+ BOOL _padHapticStarting;
  UIImageView* _screen;
  LGAutoButton* _logo;
  UIButton* _speedButton;
@@ -190,7 +194,11 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  _analysis=dispatch_queue_create("vn.anhchugia35.legend.analysis",DISPATCH_QUEUE_SERIAL);
  _slotIO=dispatch_queue_create("vn.anhchugia35.legend.slots",DISPATCH_QUEUE_SERIAL);
  _vault=[[LGSaveVault alloc]init];_quickSlots=[[LGQuickSlots alloc]initWithVault:_vault];
- _padFeedback=[[UIImpactFeedbackGenerator alloc]initWithStyle:UIImpactFeedbackStyleHeavy];
+ if(@available(iOS 17.5,*)){
+  _padFeedback=[UIImpactFeedbackGenerator feedbackGeneratorWithStyle:UIImpactFeedbackStyleHeavy forView:self.view];
+ }else{
+  _padFeedback=[[UIImpactFeedbackGenerator alloc]initWithStyle:UIImpactFeedbackStyleHeavy];
+ }
  NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
  _imageFilter.store(int(std::clamp<NSInteger>([prefs integerForKey:@"filter_mode"],0,2)));
  _renderedFilter=-1;
@@ -253,7 +261,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (BOOL)hasBundledGame{
  return [NSFileManager.defaultManager fileExistsAtPath:[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"mod2/content.sealed"].path];
 }
-- (void)viewDidAppear:(BOOL)animated{[super viewDidAppear:animated];[_padFeedback prepare];[self becomeFirstResponder];if(!_operation)[self resume];
+- (void)viewDidAppear:(BOOL)animated{[super viewDidAppear:animated];[self preparePadHaptics];[self becomeFirstResponder];if(!_operation)[self resume];
  if([NSProcessInfo.processInfo.environment[@"LEGEND_SMOKE"] isEqualToString:@"1"]){dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),dispatch_get_main_queue(),^{[self runSmoke];});}
  else if(!_triedBundled&&[self hasBundledGame]){
   _triedBundled=YES;
@@ -872,7 +880,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 
 - (void)pause{[self stopAuto];_paused=YES;_clock=0;[self releaseButtons];[_audioEngine pause];_core->audio.clear();}
 - (void)resume{if(self.presentedViewController)return;[self resumePlayback];}
-- (void)resumePlayback{if(!_ready||_background||_operation)return;_paused=NO;_clock=0;_frameDebt=0;NSError* error=nil;if(!_audioEngine)[self startAudio:&error];else [_audioEngine startAndReturnError:&error];if(error)NSLog(@"Legend audio: %@",error);}
+- (void)resumePlayback{if(!_ready||_background||_operation)return;_paused=NO;_clock=0;_frameDebt=0;NSError* error=nil;if(!_audioEngine)[self startAudio:&error];else [_audioEngine startAndReturnError:&error];if(error)NSLog(@"Legend audio: %@",error);[self preparePadHaptics];}
 - (void)background{_background=YES;_transactionCancelled.store(true);[self pause];dispatch_async(_worker,^{[self persistCard];});}
 - (void)foreground{_background=NO;[self resume];}
 - (void)audioInterrupted:(NSNotification*)note{NSNumber* type=note.userInfo[AVAudioSessionInterruptionTypeKey];if(type.unsignedIntegerValue==AVAudioSessionInterruptionTypeBegan)[self pause];else [self resume];}
@@ -884,16 +892,64 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   ring->render(static_cast<float*>(buffers->mBuffers[0].mData),static_cast<float*>(buffers->mBuffers[1].mData),frames);*silence=NO;return noErr;
  }];[_audioEngine attachNode:_audioSource];[_audioEngine connect:_audioSource to:_audioEngine.mainMixerNode format:format];_audioEngine.mainMixerNode.outputVolume=_muted?0:_volume;[_audioEngine startAndReturnError:error];
 }
+- (void)preparePadHaptics{
+ if(_background||_padHapticPlayer||_padHapticStarting)return;
+ [_padFeedback prepare];
+ if(!CHHapticEngine.capabilitiesForHardware.supportsHaptics)return;
+
+ if(!_padHapticEngine){
+  NSError* error=nil;
+  _padHapticEngine=[[CHHapticEngine alloc]initAndReturnError:&error];
+  if(!_padHapticEngine){NSLog(@"Legend could not create the haptic engine: %@",error);return;}
+  _padHapticEngine.playsHapticsOnly=YES;
+  __weak LGPlayer* weak=self;
+  void (^invalidatePlayer)(void)=^{
+   dispatch_async(dispatch_get_main_queue(),^{
+    LGPlayer* owner=weak;
+    if(owner)owner->_padHapticPlayer=nil;
+   });
+  };
+  _padHapticEngine.stoppedHandler=^(CHHapticEngineStoppedReason reason){invalidatePlayer();};
+  _padHapticEngine.resetHandler=invalidatePlayer;
+ }
+
+ _padHapticStarting=YES;
+ __weak LGPlayer* weak=self;
+ [_padHapticEngine startWithCompletionHandler:^(NSError* startError){
+  dispatch_async(dispatch_get_main_queue(),^{
+   LGPlayer* owner=weak;
+   if(!owner)return;
+   owner->_padHapticStarting=NO;
+   if(owner->_background)return;
+   if(startError){NSLog(@"Legend could not start the haptic engine: %@",startError);return;}
+
+   // A short rumble is easier to feel on a gamepad tap than a transient click.
+   CHHapticEventParameter* intensity=[[CHHapticEventParameter alloc]initWithParameterID:CHHapticEventParameterIDHapticIntensity value:1.0f];
+   CHHapticEventParameter* sharpness=[[CHHapticEventParameter alloc]initWithParameterID:CHHapticEventParameterIDHapticSharpness value:0.45f];
+   CHHapticEvent* pulse=[[CHHapticEvent alloc]initWithEventType:CHHapticEventTypeHapticContinuous
+       parameters:@[intensity,sharpness] relativeTime:0 duration:0.04];
+   NSError* error=nil;
+   CHHapticPattern* pattern=[[CHHapticPattern alloc]initWithEvents:@[pulse] parameters:@[] error:&error];
+   if(pattern)owner->_padHapticPlayer=[owner->_padHapticEngine createPlayerWithPattern:pattern error:&error];
+   if(error)NSLog(@"Legend could not prepare the gamepad rumble: %@",error);
+  });
+ }];
+}
+- (void)playPadHaptic{
+ NSError* error=nil;
+ if(_padHapticPlayer&&[_padHapticPlayer startAtTime:CHHapticTimeImmediate error:&error])return;
+ if(error)NSLog(@"Legend could not play the gamepad rumble: %@",error);
+ _padHapticPlayer=nil;
+ [_padFeedback impactOccurred];
+ [self preparePadHaptics];
+}
 - (void)source:(unsigned)source mask:(uint16_t)mask{
  if(source>=3)return;
  if(source==1&&!_controllerEnabled)mask=0;
  uint16_t previous=_sources[source];
  if(mask&~previous)[self stopAuto];
  if(_paused||_background||!_ready)mask=0;
- if(source==0&&Legend::touchNeedsFeedback(previous,mask)){
-  [_padFeedback impactOccurred];
-  [_padFeedback prepare];
- }
+ if(source==0&&Legend::touchNeedsFeedback(previous,mask))[self playPadHaptic];
  _sources[source]=mask;
  uint16_t next=_sources[0]|_sources[1]|_sources[2];
  for(unsigned i=0;i<14;i++)if((next^_combined)&(1<<i)){

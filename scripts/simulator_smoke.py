@@ -37,7 +37,7 @@ def main():
    artifacts=ROOT/'build/app-artifacts'
    artifacts.mkdir(exist_ok=True)
    if sample.exists():shutil.copyfile(sample,artifacts/sample.name)
-   fields=('app_launched','all_14_buttons_inside_view','console_skin_layout','orientation_matches','quick_icons_overlay_game','speed_text_sync','speed_toggle','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops','circular_logo','authenticated_quick_slot','gacha_star_readability')
+   fields=('app_launched','all_14_buttons_inside_view','console_skin_layout','orientation_matches','quick_icons_overlay_game','speed_text_sync','speed_toggle','speed_button_visibility','speed_button_inside_safe_area','landscape_game_fills_height','auto_ring_stops','circular_logo','authenticated_quick_slot','gacha_star_readability','pad_haptics_switch_persists')
    if not all(current[field] for field in fields):
     diagnostic=subprocess.run(['xcrun','simctl','spawn',device,'log','show','--last','5m','--style','compact','--predicate','process == "Legend"'],capture_output=True,text=True)
     (ROOT/'build/iphonesimulator/smoke-runtime.log').write_text(diagnostic.stdout+'\n'+diagnostic.stderr)

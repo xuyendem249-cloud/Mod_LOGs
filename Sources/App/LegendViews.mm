@@ -485,16 +485,31 @@ static NSArray<NSString*>* imageFilters(){return @[@"Gốc",@"Làm nét nhẹ",@
 - (void)viewDidLoad{[super viewDidLoad];self.title=@"Cài Đặt";self.view.backgroundColor=LGInk();self.tableView.backgroundColor=LGInk();self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithTitle:@"Xong" style:UIBarButtonItemStyleDone target:self action:@selector(close)];}
 - (void)close{[self dismissViewControllerAnimated:YES completion:self.closed];}
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)table{return 3;}
-- (NSInteger)tableView:(UITableView*)table numberOfRowsInSection:(NSInteger)section{return section==0?5:section==1?(self.bundledGame?1:2):1;}
+- (NSInteger)tableView:(UITableView*)table numberOfRowsInSection:(NSInteger)section{return section==0?6:section==1?(self.bundledGame?1:2):1;}
 - (NSString*)tableView:(UITableView*)table titleForHeaderInSection:(NSInteger)section{return @[@"Tỉ lệ khung · Vừa khung",@"Trò chơi",@"Mã nguồn và giấy phép"][section];}
 - (UITableViewCell*)tableView:(UITableView*)table cellForRowAtIndexPath:(NSIndexPath*)p{
  UITableViewCell* c=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];c.backgroundColor=[UIColor colorWithRed:.14 green:.09 blue:.22 alpha:1];c.textLabel.textColor=UIColor.whiteColor;c.detailTextLabel.textColor=LGGold();c.textLabel.font=[UIFont systemFontOfSize:14];
+ if(p.section==0&&p.row==5){
+  c.textLabel.text=@"Rung khi bấm phím";
+  c.selectionStyle=UITableViewCellSelectionStyleNone;
+  UISwitch* toggle=[[UISwitch alloc]init];
+  toggle.on=self.padHapticsEnabled;
+  toggle.onTintColor=LGGold();
+  toggle.accessibilityLabel=c.textLabel.text;
+  [toggle addTarget:self action:@selector(padHapticsToggled:) forControlEvents:UIControlEventValueChanged];
+  c.accessoryView=toggle;
+  return c;
+ }
  if(p.section==0){c.textLabel.text=@[@"Fusion",@"Tốc độ",@"Slot lưu nhanh",@"Âm lượng",@"Hình ảnh"][p.row];c.detailTextLabel.text=p.row==0?@[@"Tắt",@"Chỉ số thứ tự",@"Số + hướng dẫn"][self.fusionMode]:p.row==1?LGText(Legend::playbackSpeedText(self.speed)):p.row==2?[NSString stringWithFormat:@"%ld / 10",(long)self.slot]:p.row==4?imageFilters()[self.imageFilter]:@"";if(p.row==3){UISlider* s=[[UISlider alloc]initWithFrame:CGRectMake(0,0,170,32)];s.minimumValue=0;s.maximumValue=1;s.value=self.volume;[s addTarget:self action:@selector(volumeChanged:) forControlEvents:UIControlEventValueChanged];c.accessoryView=s;}}
  else if(p.section==1)c.textLabel.text=self.bundledGame?@"Khởi động lại game":@[@"Nhập BIOS 512 KB",@"Khởi động lại game"][p.row];else c.textLabel.text=@"SwanStation · mã nguồn · giấy phép";return c;
 }
 - (void)volumeChanged:(UISlider*)s{self.volume=s.value;if(self.changed)self.changed(self);}
+- (void)padHapticsToggled:(UISwitch*)toggle{
+ self.padHapticsEnabled=toggle.on;
+ if(self.padHapticsChanged)self.padHapticsChanged(toggle.on);
+}
 - (void)tableView:(UITableView*)table didSelectRowAtIndexPath:(NSIndexPath*)p{
- [table deselectRowAtIndexPath:p animated:YES];if(p.section==0&&p.row!=3){
+ [table deselectRowAtIndexPath:p animated:YES];if(p.section==0&&(p.row==3||p.row==5))return;if(p.section==0){
  NSMutableArray<NSString*>* choices=[NSMutableArray array];
  if(p.row==0)[choices addObjectsFromArray:@[@"Tắt",@"Chỉ đánh số",@"Số + bảng hướng dẫn"]];
  else if(p.row==1)for(double speed:Legend::playbackSpeeds)[choices addObject:LGText(playbackSpeedText(speed))];

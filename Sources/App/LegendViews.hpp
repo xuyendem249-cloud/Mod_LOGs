@@ -36,9 +36,11 @@ NSAttributedString* LGDescription(Legend::GameData&,int);
 @interface LGSettingsController:UITableViewController
 @property(nonatomic) NSInteger fusionMode,slot,imageFilter;
 @property(nonatomic) BOOL bundledGame;
+@property(nonatomic) BOOL padHapticsEnabled;
 @property(nonatomic) double speed;
 @property(nonatomic) float volume;
 @property(nonatomic,copy) void(^changed)(LGSettingsController*);
+@property(nonatomic,copy) void(^padHapticsChanged)(BOOL);
 @property(nonatomic,copy) void(^command)(NSString*);
 @property(nonatomic,copy) void(^closed)(void);
 @end

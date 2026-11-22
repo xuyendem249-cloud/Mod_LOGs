@@ -24,6 +24,7 @@
 static UIColor* Gold(){return LGGold();}
 static UIColor* Ink(){return LGInk();}
 static NSString* const LGErrorDomain=@"LegendPlayer";
+static NSString* const LGPadHapticsKey=@"pad_haptics_enabled";
 static NSError* Failure(NSString* text){return [NSError errorWithDomain:LGErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey:text}];}
 namespace Skin=Legend::ConsoleSkin;
 
@@ -126,7 +127,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  UIImpactFeedbackGenerator* _padFeedback;
  CHHapticEngine* _padHapticEngine;
  id<CHHapticPatternPlayer> _padHapticPlayer;
- BOOL _padHapticStarting;
+ BOOL _padHapticStarting,_padHapticsEnabled;
  UIImageView* _screen;
  LGAutoButton* _logo;
  UIButton* _speedButton;
@@ -200,6 +201,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   _padFeedback=[[UIImpactFeedbackGenerator alloc]initWithStyle:UIImpactFeedbackStyleHeavy];
  }
  NSUserDefaults* prefs=NSUserDefaults.standardUserDefaults;_fusionMode=MAX(0,MIN(2,[prefs integerForKey:@"fusion_mode"]));_slot=MAX(1,MIN(10,[prefs integerForKey:@"save_slot"]));_speed=1;_boostSpeed=1.2;_volume=[prefs objectForKey:@"volume"]?[prefs floatForKey:@"volume"]:.8;
+ _padHapticsEnabled=[prefs objectForKey:LGPadHapticsKey]?[prefs boolForKey:LGPadHapticsKey]:YES;
  _imageFilter.store(int(std::clamp<NSInteger>([prefs integerForKey:@"filter_mode"],0,2)));
  _renderedFilter=-1;
  _controllerEnabled=[prefs objectForKey:@"gamepad_enabled"]?[prefs boolForKey:@"gamepad_enabled"]:YES;
@@ -379,6 +381,22 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  }
  [self smokeProgress:@"speed 2"];[self setPlaybackSpeed:2];LGSettingsController* settings=[self configuredSettings];[settings loadViewIfNeeded];UITableViewCell* cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];BOOL synced=[self->_speedButton.accessibilityValue isEqualToString:@"2×"]&&[cell.detailTextLabel.text isEqualToString:@"2×"];
  [self smokeProgress:@"settings speed 3"];settings.speed=3;settings.changed(settings);cell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];synced=synced&&[self->_speedButton.accessibilityValue isEqualToString:@"3×"]&&[cell.detailTextLabel.text isEqualToString:@"3×"];
+ UITableViewCell* hapticsCell=[settings tableView:settings.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:5 inSection:0]];
+ UISwitch* haptics=(UISwitch*)hapticsCell.accessoryView;
+ BOOL hapticsPersist=NO;
+ if([haptics isKindOfClass:UISwitch.class]){
+  BOOL initial=haptics.on;
+  BOOL matches=initial==self->_padHapticsEnabled;
+  for(NSNumber* enabled in @[@NO,@YES]){
+   haptics.on=enabled.boolValue;
+   [haptics sendActionsForControlEvents:UIControlEventValueChanged];
+   matches=matches&&[self configuredSettings].padHapticsEnabled==enabled.boolValue&&
+       [NSUserDefaults.standardUserDefaults boolForKey:LGPadHapticsKey]==enabled.boolValue;
+  }
+  haptics.on=initial;
+  [haptics sendActionsForControlEvents:UIControlEventValueChanged];
+  hapticsPersist=matches;
+ }
  [self smokeProgress:@"core speed sync"];__block double coreSpeed=0;dispatch_sync(self->_worker,^{coreSpeed=self->_core->playbackRate();});synced=synced&&std::abs(coreSpeed-3)<.001;
  [self toggleSpeed];BOOL togglesToNormal=std::abs(self->_speed-1)<.001;
  [self toggleSpeed];BOOL togglesToBoost=std::abs(self->_speed-3)<.001;
@@ -391,7 +409,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  BOOL console=CGRectContainsRect(deck,self->_screen.frame)&&CGRectContainsRect(safe,self->_faceWell.frame)&&
   CGRectContainsRect(safe,self->_dpad.frame)&&self->_pads[@4].hidden&&self->_pads[@8].frame.size.width>0;
  BOOL brightGachaWallet=[self smokeGachaWallet:mode];
- [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"console_skin_layout":@(console),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot),@"gacha_star_readability":@(brightGachaWallet),@"device_keychain_tested":@NO};
+ [self smokeProgress:@"write report"];NSDictionary* report=@{@"app_launched":@YES,@"all_14_buttons_inside_view":@(valid),@"console_skin_layout":@(console),@"game_or_bios_tested":@NO,@"orientation":mode,@"orientation_matches":@(portrait!=landscape),@"quick_icons_overlay_game":@(overlay),@"speed_text_sync":@(synced),@"speed_toggle":@(togglesToNormal&&togglesToBoost),@"speed_button_visibility":@(!self->_speedButton.hidden),@"speed_button_inside_safe_area":@(CGRectContainsRect(safe,self->_speedButton.frame)),@"landscape_game_fills_height":@(expanded),@"auto_ring_stops":@(ringStopped),@"circular_logo":@(roundLogo),@"authenticated_quick_slot":@(protectedSlot),@"gacha_star_readability":@(brightGachaWallet),@"pad_haptics_switch_persists":@(hapticsPersist),@"device_keychain_tested":@NO};
  NSData* json=[NSJSONSerialization dataWithJSONObject:report options:0 error:nil];[json writeToFile:[self->_root stringByAppendingPathComponent:[NSString stringWithFormat:@"simulator_smoke-%@.json",mode]] atomically:YES];
  });
 }
@@ -893,7 +911,7 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
  }];[_audioEngine attachNode:_audioSource];[_audioEngine connect:_audioSource to:_audioEngine.mainMixerNode format:format];_audioEngine.mainMixerNode.outputVolume=_muted?0:_volume;[_audioEngine startAndReturnError:error];
 }
 - (void)preparePadHaptics{
- if(_background||_padHapticPlayer||_padHapticStarting)return;
+ if(!_padHapticsEnabled||_background||_padHapticPlayer||_padHapticStarting)return;
  [_padFeedback prepare];
  if(!CHHapticEngine.capabilitiesForHardware.supportsHaptics)return;
 
@@ -903,10 +921,12 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
   if(!_padHapticEngine){NSLog(@"Legend could not create the haptic engine: %@",error);return;}
   _padHapticEngine.playsHapticsOnly=YES;
   __weak LGPlayer* weak=self;
+  __weak CHHapticEngine* configuredEngine=_padHapticEngine;
   void (^invalidatePlayer)(void)=^{
    dispatch_async(dispatch_get_main_queue(),^{
     LGPlayer* owner=weak;
-    if(owner)owner->_padHapticPlayer=nil;
+    CHHapticEngine* engine=configuredEngine;
+    if(owner&&engine&&owner->_padHapticEngine==engine)owner->_padHapticPlayer=nil;
    });
   };
   _padHapticEngine.stoppedHandler=^(CHHapticEngineStoppedReason reason){invalidatePlayer();};
@@ -915,10 +935,12 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 
  _padHapticStarting=YES;
  __weak LGPlayer* weak=self;
+ __weak CHHapticEngine* startingEngine=_padHapticEngine;
  [_padHapticEngine startWithCompletionHandler:^(NSError* startError){
   dispatch_async(dispatch_get_main_queue(),^{
    LGPlayer* owner=weak;
-   if(!owner)return;
+   CHHapticEngine* engine=startingEngine;
+   if(!owner||!engine||owner->_padHapticEngine!=engine)return;
    owner->_padHapticStarting=NO;
    if(owner->_background)return;
    if(startError){NSLog(@"Legend could not start the haptic engine: %@",startError);return;}
@@ -930,18 +952,31 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
        parameters:@[intensity,sharpness] relativeTime:0 duration:0.04];
    NSError* error=nil;
    CHHapticPattern* pattern=[[CHHapticPattern alloc]initWithEvents:@[pulse] parameters:@[] error:&error];
-   if(pattern)owner->_padHapticPlayer=[owner->_padHapticEngine createPlayerWithPattern:pattern error:&error];
+   if(pattern)owner->_padHapticPlayer=[engine createPlayerWithPattern:pattern error:&error];
    if(error)NSLog(@"Legend could not prepare the gamepad rumble: %@",error);
   });
  }];
 }
 - (void)playPadHaptic{
+ if(!_padHapticsEnabled)return;
  NSError* error=nil;
  if(_padHapticPlayer&&[_padHapticPlayer startAtTime:CHHapticTimeImmediate error:&error])return;
  if(error)NSLog(@"Legend could not play the gamepad rumble: %@",error);
  _padHapticPlayer=nil;
  [_padFeedback impactOccurred];
  [self preparePadHaptics];
+}
+- (void)setPadHapticsEnabled:(BOOL)enabled{
+ _padHapticsEnabled=enabled;
+ [NSUserDefaults.standardUserDefaults setBool:enabled forKey:LGPadHapticsKey];
+ if(enabled){
+  [self preparePadHaptics];
+ }else{
+  [_padHapticEngine stopWithCompletionHandler:nil];
+  _padHapticPlayer=nil;
+  _padHapticEngine=nil;
+  _padHapticStarting=NO;
+ }
 }
 - (void)source:(unsigned)source mask:(uint16_t)mask{
  if(source>=3)return;
@@ -1146,6 +1181,8 @@ static CGRect LGRect(Legend::Box b,CGPoint origin){return CGRectMake(origin.x+b.
 - (LGSettingsController*)configuredSettings{
  LGSettingsController* settings=[[LGSettingsController alloc]initWithStyle:UITableViewStyleInsetGrouped];settings.fusionMode=_fusionMode;settings.slot=_slot;settings.speed=_speed;settings.volume=_volume;settings.bundledGame=[self hasBundledGame];settings.imageFilter=_imageFilter.load();__weak LGPlayer* weak=self;
  settings.changed=^(LGSettingsController* s){LGPlayer* owner=weak;if(!owner)return;owner->_fusionMode=s.fusionMode;BOOL slotChanged=owner->_slot!=s.slot;owner->_slot=s.slot;[owner setPlaybackSpeed:s.speed];[owner setImageFilter:int(s.imageFilter)];owner->_volume=s.volume;owner->_audioEngine.mainMixerNode.outputVolume=owner->_muted?0:s.volume;NSUserDefaults* p=NSUserDefaults.standardUserDefaults;[p setInteger:s.fusionMode forKey:@"fusion_mode"];[p setInteger:s.slot forKey:@"save_slot"];[p setFloat:s.volume forKey:@"volume"];if(slotChanged)[owner preloadQuickSlot:s.slot];[owner.view setNeedsLayout];};
+ settings.padHapticsEnabled=_padHapticsEnabled;
+ settings.padHapticsChanged=^(BOOL enabled){[weak setPadHapticsEnabled:enabled];};
  settings.closed=^{[weak resumePlayback];};settings.command=^(NSString* command){[weak command:command];};return settings;
 }
 - (void)setImageFilter:(int)mode{
